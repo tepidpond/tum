@@ -1,0 +1,13 @@
+eclipse/
+.metadata/
+bin/
+.gradle/
+.settings/
+.classpath
+.project
+CREDITS-fml.txt
+LICENSE-fml.txt
+MinecraftForge-Credits.txt
+MinecraftForge-License.txt
+README.txt
+forge-*-changelog.txt
