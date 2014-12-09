@@ -3,7 +3,7 @@
   "modid": "TUM",
   "name": "The Unknown Mod",
   "description": "The Unknown Mod (working title) is a mod that brings a little more realism to Minecraft.",
-  "version": "1.7.10-0.1",
+  "version": "${version}",
   "mcversion": "${mcversion}",
   "url": "http://github.com/",
   "updateUrl": "",

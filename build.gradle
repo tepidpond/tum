@@ -17,7 +17,7 @@ buildscript {
 
 apply plugin: 'forge'
 
-version = "1.0"
+version = "1.7.10_0.1"
 group= "com.tepidpond.tum" // http://maven.apache.org/guides/mini/guide-naming-conventions.html
 archivesBaseName = "tum"
 
@@ -40,6 +40,19 @@ dependencies {
     // http://www.gradle.org/docs/current/userguide/artifact_dependencies_tutorial.html
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
 
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = [ 'src/java' ]
+            exclude '**/resources/'
+        }
+        resources {
+            srcDirs = [ 'src/Resources' ]
+            exclude '**/java'
+        }
+    }
 }
 
 processResources

@@ -9,7 +9,7 @@ import cpw.mods.fml.common.event.FMLInitializationEvent;
 public class TUM
 {
     public static final String MODID = "TUM";
-    public static final String VERSION = "0.1";
+    public static final String VERSION = "${version}";
     
     @EventHandler
     public void init(FMLInitializationEvent event)
