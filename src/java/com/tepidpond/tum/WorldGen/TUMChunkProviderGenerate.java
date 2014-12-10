@@ -22,6 +22,10 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 			super(world, seed, par4);
 			worldObj = world;
 			rand = new Random(seed);
+			
+			this.idsTop = new Block[32768];
+			this.idsBig = new Block[16*16*256];
+			this.metaBig = new byte[16*16*256];		
 	}
 	
 	@Override
@@ -29,18 +33,37 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 	{
 		this.rand.setSeed(chunkX * 341873128712L + chunkZ * 132897987541L);
 		
-		
 		Arrays.fill(idsTop, null);
 		Arrays.fill(idsBig, null);
 		Arrays.fill(metaBig, (byte)0);
 		
 		this.generateTerrainHigh(chunkX, chunkZ, idsTop);
+		replaceBlocksForBiomeHigh(chunkX, chunkZ, idsTop, rand, idsBig, metaBig);
 		
 		Chunk chunk = new Chunk(this.worldObj, idsBig, metaBig, chunkX, chunkZ);
 		
-		
 		chunk.generateSkylightMap();
 		return chunk;
+	}
+
+	private void replaceBlocksForBiomeHigh(int chunkX, int chunkZ, Block[] idsTop, Random rand, Block[] idsBig, byte[] metaBig) {
+		int worldHeight = 256;
+		int indexOffset = 128;
+		
+		for (int x = 0; x<16; x++)
+		{
+			for (int z = 0; z<16; z++)
+			{
+				int arrayIndex = x + z * 16;
+				for (int height = 127; height >= 0; height--)
+				{
+					int indexBig = arrayIndex * worldHeight + height + indexOffset;
+					int indexTop = arrayIndex * 128 + height;
+					idsBig[indexBig] = idsTop[indexTop];
+				}
+			}
+		}
+		
 	}
 
 	public void generateTerrainHigh(int chunkX, int chunkZ, Block[] idsTop)
@@ -66,7 +89,7 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 						for (int j=0; j<4; j++)
 						{
 							int index = j + x*4 << 11 | 0 + z*4 << 7 | y*8 + i;
-							index -= arrayYHeight;
+
 							for (int k=0; k<4; k++)
 							{
 								if (y*8+i < seaLevel)

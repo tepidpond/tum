@@ -2,12 +2,17 @@ package com.tepidpond.tum.WorldGen;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
+import net.minecraft.world.ChunkPosition;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldType;
 import net.minecraft.world.biome.BiomeCache;
+import net.minecraft.world.biome.BiomeGenBase;
 import net.minecraft.world.biome.WorldChunkManager;
 import net.minecraft.world.gen.layer.GenLayer;
+import net.minecraft.world.gen.layer.GenLayerBiome;
+import net.minecraft.world.gen.layer.GenLayerVoronoiZoom;
 
 public class TUMWorldChunkManager extends WorldChunkManager {
 	protected World worldObj;
@@ -34,5 +39,55 @@ public class TUMWorldChunkManager extends WorldChunkManager {
 	public TUMWorldChunkManager(long Seed, WorldType terrainType) {
 		this();
 		seed = Seed;
+		
+		GenLayer[] layers;
+		layers = GenLayer.initializeAllBiomeGenerators(Seed, TUMWorldType.DEFAULT);
+		this.genBiomes = new TUMGenLayerIsland(Seed);
+		this.biomeIndexLayer = new TUMGenLayerIsland(Seed);
+	}
+	
+	@Override
+	public ChunkPosition findBiomePosition(int x, int z, int radius, List biomeList, Random rand)
+	{
+		// TODO: Probably do something here.
+		return new ChunkPosition(x, 0, z); 
+	}
+	
+	@Override
+	public float[] getRainfall(float[] listToReuse, int x, int z, int width, int length)
+	{
+		// TODO: Definitely something here.
+		return new float[width*length];
+	}
+	
+	@Override
+	public BiomeGenBase[] getBiomeGenAt(BiomeGenBase[] biome, int x, int z, int width, int length, boolean cacheFlag)
+	{
+		if (biome == null || biome.length < width*length)
+			biome = new TUMBiome[width*length];
+		
+		if (cacheFlag && width==16 && length==16 && (x & 15)==0 && (z & 15)==0)
+		{
+			BiomeGenBase[] cache = this.biomeCache.getCachedBiomes(x, z);
+			System.arraycopy(cache, 0, biome, 0, width*length);
+		} else {
+			int[] ints = this.biomeIndexLayer.getInts(x, z, width, length);
+			for(int iz = 0; iz<width; iz++)
+			{
+				for (int ix = 0; ix<length; ix++)
+				{
+					int id = ints[iz * width + ix] != -1 ? ints[iz * width + ix] : 0;
+					biome[iz * width + ix] = TUMBiome.plains;
+				}
+			}
+		}
+		return biome;
+	}
+	
+	@Override
+	public boolean areBiomesViable(int x, int z, int radius, List allowableBiomes)
+	{
+		// TODO: Definitely something here.
+		return true;
 	}
 }
