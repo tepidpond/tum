@@ -49,7 +49,7 @@ sourceSets {
             exclude '**/resources/'
         }
         resources {
-            srcDirs = [ 'src/Resources' ]
+            srcDirs = [ 'src/resources' ]
             exclude '**/java'
         }
     }

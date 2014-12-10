@@ -1,6 +1,8 @@
 package com.tepidpond.tum;
 
 import net.minecraft.init.Blocks;
+import net.minecraft.world.WorldType;
+import net.minecraftforge.common.DimensionManager;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.Mod.EventHandler;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
@@ -10,6 +12,14 @@ public class TUM
 {
     public static final String MODID = "TUM";
     public static final String VERSION = "${version}";
+    public static WorldType TUMWorldType = new TUMWorldType("TUMDefault");
+    
+    @EventHandler
+    public void preInit(FMLInitializationEvent event)
+    {
+    	// TODO
+    	//WorldType.DEFAULT = TUMWorldType;
+    }
     
     @EventHandler
     public void init(FMLInitializationEvent event)
