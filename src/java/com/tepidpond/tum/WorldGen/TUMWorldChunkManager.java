@@ -61,23 +61,23 @@ public class TUMWorldChunkManager extends WorldChunkManager {
 	}
 	
 	@Override
-	public BiomeGenBase[] getBiomeGenAt(BiomeGenBase[] biome, int x, int z, int width, int length, boolean cacheFlag)
+	public BiomeGenBase[] getBiomeGenAt(BiomeGenBase[] biome, int xOrigin, int zOrigin, int width, int length, boolean cacheFlag)
 	{
 		if (biome == null || biome.length < width*length)
 			biome = new TUMBiome[width*length];
 		
-		if (cacheFlag && width==16 && length==16 && (x & 15)==0 && (z & 15)==0)
+		// Only cache when dealing with full/aligned chunks
+		if (cacheFlag && width==16 && length==16 && (xOrigin & 15)==0 && (zOrigin & 15)==0)
 		{
-			BiomeGenBase[] cache = this.biomeCache.getCachedBiomes(x, z);
-			System.arraycopy(cache, 0, biome, 0, width*length);
+			BiomeGenBase[] cache = this.biomeCache.getCachedBiomes(xOrigin, zOrigin);
+			System.arraycopy(cache, 0, biome, 0, width * length);
 		} else {
-			int[] ints = this.biomeIndexLayer.getInts(x, z, width, length);
-			for(int iz = 0; iz<width; iz++)
-			{
-				for (int ix = 0; ix<length; ix++)
-				{
-					int id = ints[iz * width + ix] != -1 ? ints[iz * width + ix] : 0;
-					biome[iz * width + ix] = TUMBiome.plains;
+			// Get data from PRNG
+			int[] ints = this.biomeIndexLayer.getInts(xOrigin, zOrigin, width, length);
+			for(int z = 0; z < width; z++) {
+				for (int x = 0; x < length; x++) {
+					int id = ints[z * width + x] != -1 ? ints[z * width + x] : 0;
+					biome[z * width + x] = TUMBiome.plains;
 				}
 			}
 		}
