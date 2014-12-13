@@ -14,6 +14,8 @@ public class Lithosphere {
 	
 	private float heightMap[];	// denotes height of terrain of tiles
 	private float indexMap[];	// denotes plate ownership of tiles
+	private Plate plates[];
+	
 	private int mapArea;
 	private int mapSize;
 	private int numPlates;
@@ -52,6 +54,7 @@ public class Lithosphere {
 		
 		PlateArea[] plates = createPlates();
 		growPlates(plates);
+		this.plates = extractPlates(plates);
 	}
 	
 	private PlateArea[] createPlates() {
@@ -91,19 +94,76 @@ public class Lithosphere {
 				
 				int x = mapTile - (mapTile % mapSize);
 				int y = mapTile / mapSize;
-				int lft, rgt, top, btm;
+				int xLeft, xRight, yTop, yBottom;
 				int tileN, tileS, tileW, tileE;
-				if (x > 0) lft = x-1; else lft = mapSize-1;
-				if (x < mapSize - 1) rgt = x+1; else rgt = 0;
-				if (y > 0) top = y-1; else top = mapSize-1;
-				if (y < mapSize - 1) btm = y+1; else btm = 0;
+				if (x > 0) xLeft = x-1; else xLeft = mapSize-1;
+				if (x < mapSize - 1) xRight = x+1; else xRight = 0;
+				if (y > 0) yTop = y-1; else yTop = mapSize-1;
+				if (y < mapSize - 1) yBottom = y+1; else yBottom = 0;
 				
-				tileN = top * mapSize + x;
-				tileS = btm * mapSize + x;
-				tileW = y * mapSize + lft;
-				tileE = y * mapSize + rgt;
+				tileN = yTop * mapSize + x;
+				tileS = yBottom * mapSize + x;
+				tileW = y * mapSize + xLeft;
+				tileE = y * mapSize + xRight;
+				
+				if (indexMap[tileN] >= numPlates) {
+					indexMap[tileN] = i;
+					plates[i].border.addElement(tileN);
+					if (plates[i].top() == ((yTop + 1) & (mapSize - 1))) {
+						plates[i].y0 = yTop;
+					}
+				}
+				if (indexMap[tileS] >= numPlates) {
+					indexMap[tileS] = i;
+					plates[i].border.addElement(tileS);
+					if (plates[i].btm() == ((yBottom + 1) & (mapSize - 1))) {
+						plates[i].y1 = yBottom;
+					}
+				}
+				if (indexMap[tileW] >= numPlates) {
+					indexMap[tileW] = i;
+					plates[i].border.addElement(tileW);
+					if (plates[i].lft() == ((xLeft + 1) & (mapSize - 1))) {
+						plates[i].x0 = xLeft;
+					}
+				}
+				if (indexMap[tileE] >= numPlates) {
+					indexMap[tileE] = i;
+					plates[i].border.addElement(tileE);
+					if (plates[i].rgt() == ((xRight + 1) & (mapSize - 1))) {
+						plates[i].x1 = xRight;
+					}
+				}
+				
+				plates[i].border.setElementAt(plates[i].border.lastElement(), j);
+				plates[i].border.remove(plates[i].border.size()-1);
 			}
 		}
+	}
+	
+	private Plate[] extractPlates(PlateArea[] plateAreas) {
+		Plate[] plates = new Plate[numPlates];
+		for (int i = 0; i < numPlates; i++) {
+			int x0 = plateAreas[i].lft();
+			int x1 = 1 + x0 + plateAreas[i].wdt();
+			int y0 = plateAreas[i].top();
+			int y1 = 1 + y0 + plateAreas[i].hgt();
+			int width = x1 - x0;
+			int height = y1 - y0;
+			float[] plateHM = new float[width * height];
+			for (int y = y0, j = 0; y < y1; y++) {
+				for (int x = x0; x < x1; x++, j++) {
+					int k = (y & (mapSize - 1)) * mapSize + 
+							(x & (mapSize - 1));
+					if (indexMap[k] == i) {
+						plateHM[j++] = heightMap[k];
+					}
+				}
+			}
+			
+			plates[i] = new Plate(plateHM, width, height, x0, y0, i, mapSize);
+		}		
+		return plates;
 	}
 	
 	private static void separateLandAndSea(float heightMap[], float seaLevel) {
