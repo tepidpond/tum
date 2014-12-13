@@ -11,5 +11,14 @@ public class G {
 	public G() {
 		// TODO Auto-generated constructor stub
 	}
-
+	
+	public static final int getTile(int x, int y, int mapSize) {
+		return (y * mapSize + x);
+	}
+	public static final int getX(int mapTile, int mapSize) {
+		return mapTile - (mapTile % mapSize);
+	}
+	public static final int getY(int mapTile, int mapSize) {
+		return mapTile / mapSize;
+	}
 }
