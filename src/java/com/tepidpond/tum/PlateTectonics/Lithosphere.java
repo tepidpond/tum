@@ -37,7 +37,7 @@ public class Lithosphere {
 		float tmpHeightMap[] = new float[mapArea];
 		
 		// Generate initial fractal map
-		if (!SquareDiamond.SqrDmd(tmpHeightMap, mapSize + 1, SQRDMD_ROUGHNESS)) {
+		if (!SquareDiamond.SqrDmd(tmpHeightMap, mapSize + 1, SQRDMD_ROUGHNESS, seed)) {
 			// Error unable to generate height map.
 		}
 		
