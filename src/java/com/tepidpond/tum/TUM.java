@@ -1,9 +1,11 @@
 package com.tepidpond.tum;
 
-import com.tepidpond.tum.WorldGen.TUMWorldType;
-import net.minecraft.init.Blocks;
 import net.minecraft.world.WorldType;
-import net.minecraftforge.common.DimensionManager;
+import net.minecraftforge.common.MinecraftForge;
+
+import com.tepidpond.tum.WorldGen.TUMWorldType;
+
+import cpw.mods.fml.client.FMLClientHandler;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.Mod.EventHandler;
 import cpw.mods.fml.common.event.FMLInitializationEvent;
@@ -18,14 +20,16 @@ public class TUM
     @EventHandler
     public void preInit(FMLInitializationEvent event)
     {
-    	// TODO
-    	//WorldType.DEFAULT = TUMWorldType;
     }
     
     @EventHandler
     public void init(FMLInitializationEvent event)
     {
-		// some example code
-        System.out.println("DIRT BLOCK >> "+Blocks.dirt.getUnlocalizedName());
+    }
+    
+    @EventHandler
+    public void load(FMLInitializationEvent event)
+    {
+    	MinecraftForge.EVENT_BUS.register(new FarTerrainRenderer(FMLClientHandler.instance().getClient().getMinecraft()));
     }
 }

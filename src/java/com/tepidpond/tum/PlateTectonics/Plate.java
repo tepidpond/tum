@@ -35,7 +35,7 @@ public class Plate {
 	public void getMap() {
 		
 	}
-	public bool isEmpty() {
+	public boolean isEmpty() {
 		return false;
 	}
 }
