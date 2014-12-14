@@ -13,7 +13,8 @@ public class G {
 	}
 	
 	public static final int getTile(int x, int y, int mapSize) {
-		return (y * mapSize + x);
+		// heightmap is a torus
+		return ((y & (mapSize - 1)) * mapSize + (x & (mapSize - 1)));
 	}
 	public static final int getX(int mapTile, int mapSize) {
 		return mapTile - (mapTile % mapSize);

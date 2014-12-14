@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
 
+import com.tepidpond.tum.G;
+
 import scala.Array;
 
 public class Lithosphere {
@@ -41,7 +43,7 @@ public class Lithosphere {
 			// Error unable to generate height map.
 		}
 		
-		scaleHeightMap(tmpHeightMap, 0.0f, 1.0f);
+		normalizeHeightMap(tmpHeightMap);
 		float seaLevel = getSeaLevel(tmpHeightMap, percentSeaTiles, 5);
 		separateLandAndSea(tmpHeightMap, seaLevel);
 		
@@ -69,9 +71,8 @@ public class Lithosphere {
 		PlateArea[] plates = new PlateArea[numPlates];
 		for (int i = 0; i < plateCenters.size(); i++) {
 			mapTile = plateCenters.get(i);
-			int x = mapTile - (mapTile % mapSize);
-			int y = mapTile / mapSize;
-			plates[i] = new PlateArea(x, y, x, y);
+			plates[i] = new PlateArea(G.getX(i, mapSize), G.getY(i, mapSize), 
+			                          G.getX(i, mapSize), G.getY(i, mapSize));
 			plates[i].border.addElement(mapTile);
 		}
 		
@@ -101,10 +102,10 @@ public class Lithosphere {
 				if (y > 0) yTop = y-1; else yTop = mapSize-1;
 				if (y < mapSize - 1) yBottom = y+1; else yBottom = 0;
 				
-				tileN = yTop * mapSize + x;
-				tileS = yBottom * mapSize + x;
-				tileW = y * mapSize + xLeft;
-				tileE = y * mapSize + xRight;
+				tileN = G.getTile(x, yTop, mapSize);
+				tileS = G.getTile(x, yBottom, mapSize);
+				tileW = G.getTile(xLeft, y, mapSize);
+				tileE = G.getTile(xRight, y, mapSize);
 				
 				if (indexMap[tileN] >= numPlates) {
 					indexMap[tileN] = i;
@@ -153,8 +154,7 @@ public class Lithosphere {
 			float[] plateHM = new float[width * height];
 			for (int y = y0, j = 0; y < y1; y++) {
 				for (int x = x0; x < x1; x++, j++) {
-					int k = (y & (mapSize - 1)) * mapSize + 
-							(x & (mapSize - 1));
+					int k = G.getTile(x, y, mapSize);
 					if (indexMap[k] == i) {
 						plateHM[j++] = heightMap[k];
 					}
@@ -175,8 +175,8 @@ public class Lithosphere {
 		}
 	}
 	
-	// force values in the heightMap into a specified range.
-	private static void scaleHeightMap(float heightMap[], float min, float max) {
+	// force values in the heightMap into a standard [0.0f ... 1.0f] range.
+	private static void normalizeHeightMap(float heightMap[]) {
 		int mapArea = heightMap.length;
 		float minHeight = heightMap[0], maxHeight = heightMap[0];
 		for (int i = 1; i < mapArea; i++) {
@@ -185,8 +185,8 @@ public class Lithosphere {
 		}
 		
 		float scaleFactor = maxHeight - minHeight;
-		if (min != 0.0f) minHeight -= min;
-		if (min != 0.0f || max != 1.0f) scaleFactor /= (max - min);
+		//if (min != 0.0f) minHeight -= min;
+		//if (min != 0.0f || max != 1.0f) scaleFactor /= (max - min);
 
 		for (int i = 0; i < mapArea; i++) {
 			heightMap[i] = (heightMap[i] - minHeight) / scaleFactor;
@@ -194,7 +194,7 @@ public class Lithosphere {
 	}
 	
 	// Calculate height of sea giving desired sea/continent ratio
-	private static float getSeaLevel(float heightMap[], float percentSeaTiles, int maxAttempts) {
+	private static float getSeaLevel(float heightMap[], float percentSeaTiles, int maxIterations) {
 		if (percentSeaTiles >= 1.0f) return 1.0f;	// all sea
 		if (percentSeaTiles <= 0.0f) return 0.0f;	// all land
 		
@@ -202,7 +202,7 @@ public class Lithosphere {
 		float seaThreshold = 0.5f;				// start middle
 		int maxLandTiles = (int)(mapArea * (1.0f - percentSeaTiles));
 		int maxSeaTiles = (int)(mapArea * percentSeaTiles);
-		for(int i = 1; i <= maxAttempts; i++) {
+		for(int i = 1; i <= maxIterations; i++) {
 			int landTiles = 0, seaTiles = 0;
 			for (int j = 0; j < mapArea; j++) {
 				if (heightMap[j] > seaThreshold)
