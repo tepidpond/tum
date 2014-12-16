@@ -129,25 +129,26 @@ public class Lithosphere {
 	
 	private Plate[] extractPlates(PlateArea[] plateAreas) {
 		Plate[] plates = new Plate[numPlates];
-		for (int i = 0; i < numPlates; i++) {
-			int x0 = plateAreas[i].lft();
-			int x1 = 1 + x0 + plateAreas[i].wdt();
-			int y0 = plateAreas[i].top();
-			int y1 = 1 + y0 + plateAreas[i].hgt();
-			int width = x1 - x0;
-			int height = y1 - y0;
-			float[] plateHM = new float[width * height];
-			for (int y = y0, j = 0; y < y1; y++) {
-				for (int x = x0; x < x1; x++, j++) {
+		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
+			int x0 = plateAreas[activePlate].x0;
+			int x1 = plateAreas[activePlate].x1;
+			int y0 = plateAreas[activePlate].y0;
+			int y1 = plateAreas[activePlate].y1;
+			float[] plateHM = new float[(x1 - x0) * (y1 - y0)];
+			int i = 0;
+			for (int y = plateAreas[activePlate].y0; y < plateAreas[activePlate].y1; y++) {
+				for (int x = plateAreas[activePlate].x0; x < plateAreas[activePlate].x1; x++) {
 					int k = G.getTile(x, y, mapSize);
-					if (indexMap[k] == i) {
-						plateHM[j++] = heightMap[k];
+					if (indexMap[k] == activePlate) {
+						plateHM[i++] = heightMap[k];
+					} else {
+						plateHM[i++] = 0;
 					}
 				}
 			}
 			
-			plates[i] = new Plate(plateHM, width, height, x0, y0, i, mapSize);
-		}		
+			plates[activePlate] = new Plate(plateHM, x1 - x0, y1 - y0, x0, y0, activePlate, mapSize);
+		}
 		return plates;
 	}
 	
