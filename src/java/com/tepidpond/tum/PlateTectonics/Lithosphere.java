@@ -1,13 +1,10 @@
 package com.tepidpond.tum.PlateTectonics;
 
-import java.awt.Rectangle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
 
 import com.tepidpond.tum.G;
-
-import scala.Array;
 
 public class Lithosphere {
 	private static final float SQRDMD_ROUGHNESS = 0.5f;
@@ -39,11 +36,11 @@ public class Lithosphere {
 		float tmpHeightMap[] = new float[mapArea];
 		
 		// Generate initial fractal map
-		if (!SquareDiamond.SqrDmd(tmpHeightMap, mapSize + 1, SQRDMD_ROUGHNESS, seed)) {
+		if (!SquareDiamond.SqrDmd(tmpHeightMap, mapSize + 1, 1.0f, SQRDMD_ROUGHNESS, seed)) {
 			// Error unable to generate height map.
 		}
 		
-		normalizeHeightMap(tmpHeightMap);
+		G.normalizeHeightMap(tmpHeightMap);
 		float seaLevel = getSeaLevel(tmpHeightMap, percentSeaTiles, 5);
 		separateLandAndSea(tmpHeightMap, seaLevel);
 		
@@ -52,10 +49,12 @@ public class Lithosphere {
 		Arrays.fill(indexMap, numPlates + 1);
 		
 		for (int i = 0; i < mapSize; i++)
-			System.arraycopy(tmpHeightMap, i * (mapSize + 1), this.heightMap, 0, mapSize);
+			System.arraycopy(tmpHeightMap, i * (mapSize + 1), this.heightMap, i * mapSize, mapSize);
+		G.saveHeightmap(this.heightMap, mapSize, "scalped");
 		
 		PlateArea[] plates = createPlates();
 		growPlates(plates);
+		G.saveHeightmap(this.indexMap, mapSize, "plates");
 		this.plates = extractPlates(plates);
 	}
 	
@@ -65,79 +64,65 @@ public class Lithosphere {
 		for (int i = 0; i < numPlates; i++) {
 			do {
 				mapTile = rand.nextInt(mapArea);
-			} while (!plateCenters.contains(mapTile));
+			} while (plateCenters.contains(mapTile));
 			plateCenters.add(mapTile);
 		}
 		PlateArea[] plates = new PlateArea[numPlates];
 		for (int i = 0; i < plateCenters.size(); i++) {
-			mapTile = plateCenters.get(i);
-			plates[i] = new PlateArea(G.getX(i, mapSize), G.getY(i, mapSize), 
-			                          G.getX(i, mapSize), G.getY(i, mapSize));
-			plates[i].border.addElement(mapTile);
+			plates[i] = new PlateArea(plateCenters.get(i), mapSize);
 		}
 		
 		return plates;
 	}
 	
 	private void growPlates(PlateArea[] plates) {
-		Arrays.fill(indexMap, numPlates + 1);	// initialize terrain-ownership map
+		Arrays.fill(indexMap, numPlates * 2);	// initialize terrain-ownership map
 		
 		int maxBorder = 1;
-		int i;
 		while (maxBorder > 0) {
-			for (maxBorder = i = 0; i < numPlates; i++) {
-				int N = plates[i].border.size();
-				if (maxBorder < N) maxBorder = N;
-				if (N == 0) continue;
+			maxBorder = 0;
+			for (int activePlate = 0; activePlate < numPlates; activePlate++) {
+				if (plates[activePlate].borderSize()== 0)
+					continue;	// the plate has grown as far as possible in all directions.
+
+				maxBorder = Math.max(maxBorder, plates[activePlate].borderSize());
 				
-				int j = rand.nextInt(N);
-				int mapTile = plates[i].border.get(j);	// choose random location on plate
+				// choose random location on plate 
+				int plateBorderElement = rand.nextInt(plates[activePlate].borderSize());
+				int mapTile = plates[activePlate].getBorder(plateBorderElement);
 				
-				int x = mapTile - (mapTile % mapSize);
-				int y = mapTile / mapSize;
-				int xLeft, xRight, yTop, yBottom;
+				int x = G.getX(mapTile, mapSize);
+				int y = G.getY(mapTile, mapSize);
+				
+				// in the 4 cardinal directions, clamp at border.
 				int tileN, tileS, tileW, tileE;
-				if (x > 0) xLeft = x-1; else xLeft = mapSize-1;
-				if (x < mapSize - 1) xRight = x+1; else xRight = 0;
-				if (y > 0) yTop = y-1; else yTop = mapSize-1;
-				if (y < mapSize - 1) yBottom = y+1; else yBottom = 0;
+				tileN = G.getTile(x, Math.max(y - 1, 0), mapSize);
+				tileS = G.getTile(x, Math.min(y + 1, mapSize - 1), mapSize);
+				tileW = G.getTile(Math.max(x - 1, 0), y, mapSize);
+				tileE = G.getTile(Math.min(x + 1, mapSize - 1), y, mapSize);
 				
-				tileN = G.getTile(x, yTop, mapSize);
-				tileS = G.getTile(x, yBottom, mapSize);
-				tileW = G.getTile(xLeft, y, mapSize);
-				tileE = G.getTile(xRight, y, mapSize);
-				
+				// If the N/S/E/W tile is un-owned, claim it for the active plate
+				// and add it to that plate's border.
 				if (indexMap[tileN] >= numPlates) {
-					indexMap[tileN] = i;
-					plates[i].border.addElement(tileN);
-					if (plates[i].top() == ((yTop + 1) & (mapSize - 1))) {
-						plates[i].y0 = yTop;
-					}
+					indexMap[tileN] = activePlate;
+					plates[activePlate].pushBorder(tileN);
 				}
 				if (indexMap[tileS] >= numPlates) {
-					indexMap[tileS] = i;
-					plates[i].border.addElement(tileS);
-					if (plates[i].btm() == ((yBottom + 1) & (mapSize - 1))) {
-						plates[i].y1 = yBottom;
-					}
+					indexMap[tileS] = activePlate;
+					plates[activePlate].pushBorder(tileS);
 				}
 				if (indexMap[tileW] >= numPlates) {
-					indexMap[tileW] = i;
-					plates[i].border.addElement(tileW);
-					if (plates[i].lft() == ((xLeft + 1) & (mapSize - 1))) {
-						plates[i].x0 = xLeft;
-					}
+					indexMap[tileW] = activePlate;
+					plates[activePlate].pushBorder(tileW);
 				}
 				if (indexMap[tileE] >= numPlates) {
-					indexMap[tileE] = i;
-					plates[i].border.addElement(tileE);
-					if (plates[i].rgt() == ((xRight + 1) & (mapSize - 1))) {
-						plates[i].x1 = xRight;
-					}
+					indexMap[tileE] = activePlate;
+					plates[activePlate].pushBorder(tileE);
 				}
 				
-				plates[i].border.setElementAt(plates[i].border.lastElement(), j);
-				plates[i].border.remove(plates[i].border.size()-1);
+				// Overwrite processed point in border with last item from border
+				plates[activePlate].setBorder(plateBorderElement, plates[activePlate].lastBorder());
+				plates[activePlate].popBorder();
 			}
 		}
 	}
@@ -175,30 +160,12 @@ public class Lithosphere {
 		}
 	}
 	
-	// force values in the heightMap into a standard [0.0f ... 1.0f] range.
-	private static void normalizeHeightMap(float heightMap[]) {
-		int mapArea = heightMap.length;
-		float minHeight = heightMap[0], maxHeight = heightMap[0];
-		for (int i = 1; i < mapArea; i++) {
-			if (heightMap[i] < minHeight) minHeight = heightMap[i];
-			if (heightMap[i] > maxHeight) maxHeight = heightMap[i];
-		}
-		
-		float scaleFactor = maxHeight - minHeight;
-		//if (min != 0.0f) minHeight -= min;
-		//if (min != 0.0f || max != 1.0f) scaleFactor /= (max - min);
-
-		for (int i = 0; i < mapArea; i++) {
-			heightMap[i] = (heightMap[i] - minHeight) / scaleFactor;
-		}
-	}
-	
 	// Calculate height of sea giving desired sea/continent ratio
 	private static float getSeaLevel(float heightMap[], float percentSeaTiles, int maxIterations) {
 		if (percentSeaTiles >= 1.0f) return 1.0f;	// all sea
 		if (percentSeaTiles <= 0.0f) return 0.0f;	// all land
 		
-		int mapArea = (int)Math.pow(heightMap.length, 2.0f);
+		int mapArea = heightMap.length;
 		float seaThreshold = 0.5f;				// start middle
 		int maxLandTiles = (int)(mapArea * (1.0f - percentSeaTiles));
 		int maxSeaTiles = (int)(mapArea * percentSeaTiles);
