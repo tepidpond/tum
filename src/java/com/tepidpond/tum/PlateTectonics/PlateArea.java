@@ -2,8 +2,6 @@ package com.tepidpond.tum.PlateTectonics;
 
 import java.util.Vector;
 
-import com.tepidpond.tum.G;
-
 public class PlateArea {
 	private Vector<Integer> border = new Vector(2048);
 	private int mapSize;
@@ -16,10 +14,10 @@ public class PlateArea {
 	public int hgt() { return y1 - y0; }	
 	public PlateArea(int mapTile, int mapSize) {
 		this.mapSize = mapSize;
-		this.x0 = G.getX(mapTile, mapSize);
-		this.x1 = G.getX(mapTile, mapSize);
-		this.y0 = G.getY(mapTile, mapSize);
-		this.y1 = G.getY(mapTile, mapSize);
+		this.x0 = Util.getX(mapTile, mapSize);
+		this.x1 = Util.getX(mapTile, mapSize);
+		this.y0 = Util.getY(mapTile, mapSize);
+		this.y1 = Util.getY(mapTile, mapSize);
 		border.addElement(mapTile);
 	}
 	public int getBorder(int index) {
@@ -49,8 +47,8 @@ public class PlateArea {
 		return border.size();
 	}
 	private void updateBoundsToInclude(int mapTile, int mapSize) {
-		int x = G.getX(mapTile, mapSize);
-		int y = G.getY(mapTile, mapSize);
+		int x = Util.getX(mapTile, mapSize);
+		int y = Util.getY(mapTile, mapSize);
 		
 		if (y > y1) y1 = y;
 		if (y < y0) y0 = y;

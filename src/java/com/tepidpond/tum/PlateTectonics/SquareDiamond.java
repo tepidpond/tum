@@ -2,8 +2,6 @@ package com.tepidpond.tum.PlateTectonics;
 
 import java.util.Random;
 
-import com.tepidpond.tum.G;
-
 public class SquareDiamond {
 	
 	public static boolean SqrDmd(float[] map, int mapSize, float maxDisplacement, float roughness, long seed) {
@@ -19,28 +17,28 @@ public class SquareDiamond {
 	    // diamonds
 	    for (int i = x1 + level; i < x2; i += level) {
 	        for (int j = y1 + level; j < y2; j += level) {
-	            float avg = (map[G.getTile(i - level,  j - level, mapSize)] +
-	            			map[G.getTile(i, j - level, mapSize)] +
-	            			map[G.getTile(i - level, j, mapSize)] +
-	            			map[G.getTile(i, j, mapSize)]) * 0.25f;
-	            map[G.getTile(i - level / 2, j - level / 2, mapSize)] = avg + rand.nextFloat() * maxDisplacement;
+	            float avg = (map[Util.getTile(i - level,  j - level, mapSize)] +
+	            			map[Util.getTile(i, j - level, mapSize)] +
+	            			map[Util.getTile(i - level, j, mapSize)] +
+	            			map[Util.getTile(i, j, mapSize)]) * 0.25f;
+	            map[Util.getTile(i - level / 2, j - level / 2, mapSize)] = avg + rand.nextFloat() * maxDisplacement;
 	        }
 	    }
 
 	    // squares
 	    for (int i = x1 + 2 * level; i < x2; i += level) {
 	        for (int j = y1 + 2 * level; j < y2; j += level) {
-	            float a = map[G.getTile(i - level,  j - level, mapSize)];
-	            float b = map[G.getTile(i, j - level, mapSize)];
-	            float c = map[G.getTile(i - level, j, mapSize)];
+	            float a = map[Util.getTile(i - level,  j - level, mapSize)];
+	            float b = map[Util.getTile(i, j - level, mapSize)];
+	            float c = map[Util.getTile(i - level, j, mapSize)];
 	            //float d = map[G.getTile(i, j, mapSize)];
-	            float e = map[G.getTile(i - level / 2, j - level / 2, mapSize)];
+	            float e = map[Util.getTile(i - level / 2, j - level / 2, mapSize)];
 
 	        	
-	            map[G.getTile(i - level, j - level / 2, mapSize)] = 
-	            		(a + c + e + map[G.getTile(i - 3 * level / 2, j - level / 2, mapSize)]) / 4 + rand.nextFloat() * maxDisplacement;
-	            map[G.getTile(i - level / 2, j - level, mapSize)] = 
-	            		(a + b + e + map[G.getTile(i - level / 2, j - 3 * level / 2, mapSize)]) / 4 + rand.nextFloat() * maxDisplacement;
+	            map[Util.getTile(i - level, j - level / 2, mapSize)] = 
+	            		(a + c + e + map[Util.getTile(i - 3 * level / 2, j - level / 2, mapSize)]) / 4 + rand.nextFloat() * maxDisplacement;
+	            map[Util.getTile(i - level / 2, j - level, mapSize)] = 
+	            		(a + b + e + map[Util.getTile(i - level / 2, j - 3 * level / 2, mapSize)]) / 4 + rand.nextFloat() * maxDisplacement;
 	        }
 	    }
 	    

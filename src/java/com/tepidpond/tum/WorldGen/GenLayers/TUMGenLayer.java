@@ -1,8 +1,8 @@
 package com.tepidpond.tum.WorldGen.GenLayers;
 
-import com.tepidpond.tum.G;
-
 import net.minecraft.world.gen.layer.GenLayer;
+
+import com.tepidpond.tum.G;
 
 public abstract class TUMGenLayer extends GenLayer {
 	protected long worldGenSeed;

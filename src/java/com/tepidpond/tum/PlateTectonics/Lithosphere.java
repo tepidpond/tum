@@ -4,8 +4,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
 
-import com.tepidpond.tum.G;
-
 public class Lithosphere {
 	private static final float SQRDMD_ROUGHNESS = 0.5f;
 	private static final float CONTINENTAL_BASE = 1.0f;
@@ -40,7 +38,7 @@ public class Lithosphere {
 			// Error unable to generate height map.
 		}
 		
-		G.normalizeHeightMap(tmpHeightMap);
+		Util.normalizeHeightMap(tmpHeightMap);
 		float seaLevel = getSeaLevel(tmpHeightMap, percentSeaTiles, 5);
 		separateLandAndSea(tmpHeightMap, seaLevel);
 		
@@ -50,11 +48,11 @@ public class Lithosphere {
 		
 		for (int i = 0; i < mapSize; i++)
 			System.arraycopy(tmpHeightMap, i * (mapSize + 1), this.heightMap, i * mapSize, mapSize);
-		G.saveHeightmap(this.heightMap, mapSize, "scalped");
+		Util.saveHeightmap(this.heightMap, mapSize, "scalped");
 		
 		PlateArea[] plates = createPlates();
 		growPlates(plates);
-		G.saveHeightmap(this.indexMap, mapSize, "plates");
+		Util.saveHeightmap(this.indexMap, mapSize, "plates");
 		this.plates = extractPlates(plates);
 	}
 	
@@ -91,15 +89,15 @@ public class Lithosphere {
 				int plateBorderElement = rand.nextInt(plates[activePlate].borderSize());
 				int mapTile = plates[activePlate].getBorder(plateBorderElement);
 				
-				int x = G.getX(mapTile, mapSize);
-				int y = G.getY(mapTile, mapSize);
+				int x = Util.getX(mapTile, mapSize);
+				int y = Util.getY(mapTile, mapSize);
 				
 				// in the 4 cardinal directions, clamp at border.
 				int tileN, tileS, tileW, tileE;
-				tileN = G.getTile(x, Math.max(y - 1, 0), mapSize);
-				tileS = G.getTile(x, Math.min(y + 1, mapSize - 1), mapSize);
-				tileW = G.getTile(Math.max(x - 1, 0), y, mapSize);
-				tileE = G.getTile(Math.min(x + 1, mapSize - 1), y, mapSize);
+				tileN = Util.getTile(x, Math.max(y - 1, 0), mapSize);
+				tileS = Util.getTile(x, Math.min(y + 1, mapSize - 1), mapSize);
+				tileW = Util.getTile(Math.max(x - 1, 0), y, mapSize);
+				tileE = Util.getTile(Math.min(x + 1, mapSize - 1), y, mapSize);
 				
 				// If the N/S/E/W tile is un-owned, claim it for the active plate
 				// and add it to that plate's border.
@@ -138,7 +136,7 @@ public class Lithosphere {
 			int i = 0;
 			for (int y = plateAreas[activePlate].y0; y < plateAreas[activePlate].y1; y++) {
 				for (int x = plateAreas[activePlate].x0; x < plateAreas[activePlate].x1; x++) {
-					int k = G.getTile(x, y, mapSize);
+					int k = Util.getTile(x, y, mapSize);
 					if (indexMap[k] == activePlate) {
 						plateHM[i++] = heightMap[k];
 					} else {
