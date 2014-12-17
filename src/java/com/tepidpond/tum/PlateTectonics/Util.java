@@ -10,22 +10,29 @@ import javax.imageio.ImageIO;
 public class Util {
 	public static final int getTile(int x, int y, int mapSize) {
 		// heightmap is a torus
-		return ((y % mapSize) * mapSize + (x % mapSize));
+		return getTile(x, y, mapSize, mapSize);
 	}
-	public static final int getX(int mapTile, int mapSize) {
-		return (mapTile % mapSize);
+	public static final int getTile(int x, int y, int mapWidth, int mapHeight) {
+		// heightmap is a torus
+		return ((y % mapHeight) * mapWidth + (x % mapWidth));
 	}
-	public static final int getY(int mapTile, int mapSize) {
-		return mapTile / mapSize;
+	public static final int getX(int mapTile, int mapWidth) {
+		return (mapTile % mapWidth);
+	}
+	public static final int getY(int mapTile, int mapWidth) {
+		return mapTile / mapWidth;
 	}
 	
-	public static final void saveHeightmap(float heightMap[], int mapSize, String tag) {
+	public static final void saveHeightmap(float heightMap[], int mapWidth, String tag) {
+		saveHeightmap(heightMap, mapWidth, mapWidth, tag);
+	}
+	public static final void saveHeightmap(float heightMap[], int mapWidth, int mapHeight, String tag) {
 		float hm[] = normalizeHeightMapCopy(heightMap);
-		BufferedImage bi = new BufferedImage(mapSize, mapSize, BufferedImage.TYPE_INT_ARGB);
+		BufferedImage bi = new BufferedImage(mapWidth, mapHeight, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D g = bi.createGraphics();
-		for (int x=0; x<mapSize; x++) {
-			for (int y=0; y<mapSize; y++) {
-				float h = hm[getTile(x, y, mapSize)];
+		for (int x=0; x<mapWidth; x++) {
+			for (int y=0; y<mapHeight; y++) {
+				float h = hm[getTile(x, y, mapWidth, mapHeight)];
 				g.setColor(new Color(h, h, h));
 				g.drawLine(x, y, x, y);
 			}
