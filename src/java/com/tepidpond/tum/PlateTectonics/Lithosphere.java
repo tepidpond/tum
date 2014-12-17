@@ -145,6 +145,7 @@ public class Lithosphere {
 				}
 			}
 			
+			Util.saveHeightmap(plateHM, x1 - x0, y1 - y0, "plate" + Integer.toString(activePlate));
 			plates[activePlate] = new Plate(plateHM, x1 - x0, y1 - y0, x0, y0, activePlate, mapSize);
 		}
 		return plates;
