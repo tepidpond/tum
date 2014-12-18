@@ -26,10 +26,10 @@ public class Plate {
 	private float M;
 	// Center of mass of the plate in world coordinates
 	private float R_x, R_y;
-	// Components of plate's velocity. v_x and v_y are components of a unit vector, velocity is the magnitude
-	private float velocity, v_x, v_y;
+	// Components of plate's velocity. vX and vY are components of a unit vector, velocity is the magnitude
+	private float velocity, vX, vY;
 	// Components of plate's acceleration
-	private float a_x, a_y;
+	private float dX, dY;
 	
 	// Used for random off-setting in subduction routine and setting up initial direction
 	private Random rand;
@@ -40,8 +40,8 @@ public class Plate {
 	int getHeight()      {return height;}
 	int getWidth()       {return width;}
 	float getVelocity()  {return velocity;}
-	float getVelocityX() {return v_x;}
-	float getVelocityY() {return v_y;}
+	float getVelocityX() {return vX;}
+	float getVelocityY() {return vY;}
 	Boolean isEmpty()    {return M<=0;} 
 
 	public Plate(float[] heightMap, int plateMapWidth, int xOrigin, int yOrigin, int plateAge, int mapSize, Random rand) {
@@ -61,8 +61,8 @@ public class Plate {
 		// Establish initial velocity and direction.
 		double angle = 2 * Math.PI * rand.nextDouble();
 		this.velocity = 1;
-		this.v_x = (float)Math.cos(angle) * INITIAL_SPEED;
-		this.v_y = (float)Math.sin(angle) * INITIAL_SPEED;
+		this.vX = (float)Math.cos(angle) * INITIAL_SPEED;
+		this.vY = (float)Math.sin(angle) * INITIAL_SPEED;
 		// Intended for random circular motion of plate. Unused.
 		//this.alpha = -rand.nextInt(1) * Math.PI * 0.01 * rand.nextFloat();
 		
@@ -102,8 +102,8 @@ public class Plate {
 		if (newSegment >= collisionSegments.size())
 			newSegment = createSegment(xLocal, yLocal);
 		
-		collisionSegments.
-		return 0;
+		collisionSegments.elementAt(newSegment).Collisions++;
+		return collisionSegments.elementAt(newSegment).Area;
 	}
 	
 
@@ -136,8 +136,36 @@ public class Plate {
 	 * @param dX X direction of the subducting plate.
 	 * @param dY Y direction of the subducting plate.
 	 */
-	void addCrustBySubduction(int x, int y, float amount, int creationTime, int dX, int dY) {
-		//TODO
+	void addCrustBySubduction(int x, int y, float amount, int creationTime, float dX, float dY) {
+		int localX = getOffsetX(x), localY = getOffsetY(y);
+		
+		float dotProduct = vX * dX + vY * dX;
+		if (dotProduct > 0) {
+			dX -= vX;
+			dY -= vY;
+		}
+		
+		float offset = 3.0f * (float)Math.pow(rand.nextFloat(), 3.0D) * (2 * rand.nextInt(1) - 1);
+		dX = 10 * dX + offset;
+		dY = 10 * dY + offset;
+		
+		localX += dX;
+		localY += dY;
+		
+		if (width == mapSize) x &= width - 1;
+		if (height == mapSize) x &= height - 1;
+		
+		int mapTile = y * width + x;
+		if (mapTile < width * height && heightMap[mapTile] > 0) {
+			creationTime = (timestampMap[mapTile] + creationTime)/2;
+			if (amount > 0)
+				timestampMap[mapTile] = creationTime;
+			else
+				timestampMap[mapTile] = 0;
+			
+			heightMap[mapTile] += amount;
+			M += amount;
+		}
 	}
 	
 	/**
@@ -153,13 +181,38 @@ public class Plate {
 	 * the collision in question.
 	 * 
 	 * @param plate Destination plate receiving the crust
-	 * @param x X coordinate of collision point on world map.
-	 * @param y Y coordinate of collision point on world map.
+	 * @param worldX X coordinate of collision point on world map.
+	 * @param worldY Y coordinate of collision point on world map.
 	 * @return Amount of crust added to destination plate.
 	 */
-	float aggregateCrust(Plate plate, int x, int y) {
-		// TODO
-		return 0.0f;
+	float aggregateCrust(Plate plate, int worldX, int worldY) {
+		int mapTile = getMapIndex(worldX, worldY);
+		int localX = getOffsetX(worldX);
+		int localY = getOffsetY(worldY);
+		
+		int segmentID = segmentOwnerMap[mapTile];
+		CollisionSegment segment = collisionSegments.elementAt(segmentID); 
+		if (segment.Area == 0)
+			return 0;	// Ignore empty continents.
+		
+		plate.selectCollisionSegment(worldX, worldY);
+		worldX += mapSize; worldY += mapSize;
+		
+		float M_old = M;
+		for (int iY = segment.Y0; iY < segment.Y1; iY++) {
+			for (int iX = segment.X0; iX < segment.X1; iX++) {
+				int activeTile = iY * width + iX;
+				if (segmentOwnerMap[activeTile] == segmentID && heightMap[activeTile] > 0) {
+					plate.addCrustByCollision(worldX + localX - iX, worldY + localY - iY, heightMap[activeTile], timestampMap[activeTile]);
+					
+					M -= heightMap[activeTile];
+					heightMap[activeTile] = 0;
+				}
+			}
+		}
+		
+		segment.Area = 0;
+		return M_old - M;
 	}
 	
 	/**
@@ -191,12 +244,46 @@ public class Plate {
 	 * deformation process is taken away from plate's momentum.
 	 * 
 	 * @param plate Plate to test against.
-	 * @param x X coordinate of collision point on world map.
-	 * @param y Y coordinate of collision point on world map.
+	 * @param worldX X coordinate of collision point on world map.
+	 * @param worldY Y coordinate of collision point on world map.
 	 * @param collidingMass Amount of colliding mass from source plate.
 	 */
-	void collide(Plate plate, int x, int y, float collidingMass) {
-		// TODO
+	void collide(Plate plate, int worldX, int worldY, float collidingMass) {
+		float coefficientRestitution = 0.0f;
+		
+		int plateA_X = this.getOffsetX(worldX), plateA_Y = this.getOffsetY(worldY);
+		int plateB_X = plate.getOffsetX(worldX), plateB_Y = plate.getOffsetY(worldY);
+		int plateA_Tile = this.getMapIndex(worldX, worldY);
+		int plateB_Tile = plate.getMapIndex(worldX, worldY);
+
+		float plateA_dX = plateA_X - R_x;
+		float plateA_dY = plateA_Y - R_y;
+		float plateB_dX = plateB_X - plate.R_x;
+		float plateB_dY = plateB_Y - plate.R_y;
+		float collision_X = plateA_dX - plateB_dX;
+		float collision_Y = plateA_dY - plateB_dY;
+		
+		float magnitude = (float)Math.sqrt(collision_X * collision_X + collision_Y * collision_Y);
+		if (magnitude <= 0)
+			return;	// no relative motion between plates.
+		
+		collision_X /= magnitude; collision_Y /= magnitude;	// normalize collision vector
+		float relative_X = vX - plate.vX, relative_Y = vY - plate.vY;	// find relative velocity vector
+		float dotProduct = relative_X * collision_X + relative_Y * collision_Y;
+		
+		if (dotProduct <= 0)
+			return;	// plates moving away from each other.
+		
+		float denominatorOfImpulse = (float)Math.pow(magnitude, 2.0f) * (1.0f/M + 1.0f/collidingMass);
+		
+		// force of impulse
+		float J = -(1 + coefficientRestitution) * dotProduct / denominatorOfImpulse;
+		
+		// Finally apply an acceleration;
+		dX += collision_X * J / M;
+		dY += collision_Y * J / M;
+		plate.dX -= collision_X * J / (collidingMass + plate.M);
+		plate.dY -= collision_Y * J / (collidingMass + plate.M);
 	}
 	
 	/**
@@ -212,26 +299,30 @@ public class Plate {
 	
 	/**
 	 * Retrieve collision statistics of continent at given location.
-	 * @param x X coordinate of collision point on world map.
-	 * @param y Y coordinate of collision point on world map.
+	 * @param worldX X coordinate of collision point on world map.
+	 * @param worldY Y coordinate of collision point on world map.
 	 * @return Instance of collision statistic class containing percentage
 	 *         of area collided and number of collisions
 	 */
-	CollisionStatistic getCollisionInfo(int x, int y) {
-		// TODO
-		return new CollisionStatistic(0, 0.0f);
+	CollisionStatistic getCollisionInfo(int worldX, int worldY) {
+		int localX = getOffsetX(worldX), localY = getOffsetY(worldY);
+		int mapTile = getMapIndex(worldX, worldY);
+		int segmentID = segmentOwnerMap[mapTile];
+		CollisionSegment segment = collisionSegments.elementAt(segmentID);
+		
+		return new CollisionStatistic(segment.Collisions, segment.Collisions / (1.0f + segment.Area));		
 	}
 	
 	/**
 	 * Retrieve the surface area of continent lying at desired location.
 	 * 
-	 * @param x X coordinate of collision point on world map.
-	 * @param y Y coordinate of collision point on world map.
+	 * @param worldX X coordinate of collision point on world map.
+	 * @param worldY Y coordinate of collision point on world map.
 	 * @return Area of continent at desired location or 0 if none.
 	 */
-	int getContinentArea(int x, int y) {
-		// TODO
-		return 0;
+	int getContinentArea(int worldX, int worldY) {
+		int mapTile = getMapIndex(worldX, worldY);
+		return collisionSegments.elementAt(mapTile).Area;
 	}
 	
 	/**
@@ -264,11 +355,18 @@ public class Plate {
 	
 	/**
 	 * Get plate's data.
-	 * @param heightMap Crust heightmap
-	 * @param timestampMap Timestamp map.
+	 * @return heightMap data
 	 */
-	void getMap(float[] heightMap, int[] timestampMap) {
-		// TODO
+	float[] getHeightmap() {
+		return this.heightMap;
+	}
+	
+	/**
+	 * Get plate's data.
+	 * @return Time of creation data.
+	 */
+	int[] getTimestampMap() {
+		return this.timestampMap;
 	}
 	
 	/**
@@ -279,18 +377,18 @@ public class Plate {
 		updatePosition();
 	}
 	private void updateVelocity() {
-		v_x += a_x; a_x = 0;
-		v_y += a_y; a_y = 0;
+		vX += dX; dX = 0;
+		vY += dY; dY = 0;
 		
-		float len = (float)Math.sqrt(v_x * v_x + v_y * v_y);
-		v_x /= len;
-		v_y /= len;
+		float len = (float)Math.sqrt(vX * vX + vY * vY);
+		vX /= len;
+		vY /= len;
 		velocity += len - 1.0;
 		if (velocity<0) velocity = 0;
 	}
 	private void updatePosition() {
-		float leftTmp = v_x * velocity + left;
-		float topTmp = v_y * velocity + top;
+		float leftTmp = vX * velocity + left;
+		float topTmp = vY * velocity + top;
 		
 		// Wrap-around positions into torus-shaped world.
 		while (leftTmp < 0)       leftTmp += mapSize;
@@ -316,7 +414,8 @@ public class Plate {
 	 * bookkeeping and start clean.
 	 */
 	void resetSegments() {
-		// TODO
+		collisionSegments.removeAllElements();
+		Arrays.fill(segmentOwnerMap, -1);
 	}
 	
 	/**
@@ -326,7 +425,8 @@ public class Plate {
 	 * @param y Y coordinate of origin of collision on world map.
 	 */
 	void selectCollisionSegment(int x, int y) {
-		// TODO
+		int mapTile = getMapIndex(x, y);
+		activeContinentID = segmentOwnerMap[mapTile];
 	}
 
 	/**
