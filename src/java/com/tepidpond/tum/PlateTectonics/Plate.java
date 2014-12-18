@@ -4,6 +4,8 @@ import java.util.Arrays;
 import java.util.Random;
 import java.util.Vector;
 
+import org.lwjgl.util.vector.Vector4f;
+
 public class Plate {
 	private static final float DEFORMATION_WEIGHT = 5f;
 	private static final float INITIAL_SPEED = 1.0f;
@@ -434,13 +436,90 @@ public class Plate {
 	 * 
 	 * If the amount of crust to be set is negative, it'll be set to zero.
 	 * 
-	 * @param x X coordinate of desired location on the world map.
-	 * @param y Y coordinate of desired location on the world map.
+	 * @param worldX X coordinate of desired location on the world map.
+	 * @param worldY Y coordinate of desired location on the world map.
 	 * @param amount Amount of material at the given location.
 	 * @param timeStamp Time of creation of new crust.
 	 */
-	void setCrust(int x, int y, float amount, int timeStamp) {
-		// TODO
+	void setCrust(int worldX, int worldY, float amount, int timeStamp) {
+		if (amount < 0) amount = 0;	//negative mass is unlikely
+		
+		int localX = getOffsetX(worldX), localY = getOffsetY(worldY);
+		int mapTile = getMapIndex(worldX, worldY);
+		
+		if (mapTile >= width * height) {
+			Vector4f bounds = new Vector4f(
+					left, top, left + width - 1, top + height - 1
+			);
+			Vector4f dist = new Vector4f(
+					left - worldX, top - worldY,
+					(worldX < left)?mapSize:0 + worldX - bounds.w,
+					(worldY <  top)?mapSize:0 + worldY - bounds.z
+			);
+			// Add new tile to nearest plate border
+			if (dist.x > mapSize || dist.z < dist.x) dist.x = 0;
+			if (dist.y > mapSize || dist.w < dist.y) dist.y = 0;
+			if (dist.z > mapSize || dist.x < dist.z) dist.z = 0;
+			if (dist.w > mapSize || dist.y < dist.w) dist.w = 0;
+			// Force growth in 8 tile blocks (optimization maybe?)
+			if (dist.x > 0) dist.x = 8 * (int)(dist.x / 8 + 1);
+			if (dist.y > 0) dist.y = 8 * (int)(dist.y / 8 + 1);
+			if (dist.z > 0) dist.z = 8 * (int)(dist.z / 8 + 1);
+			if (dist.w > 0) dist.w = 8 * (int)(dist.w / 8 + 1);
+			
+			// Clamp new plate size to world map size
+			if (width + dist.x + dist.z > mapSize) {
+				dist.x = 0;
+				dist.z = mapSize - width;
+			}
+			if (height + dist.y + dist.w > mapSize) {
+				dist.y = 0;
+				dist.w = mapSize - height;
+			}
+			
+			// Update plate bounds based on distance
+			left   -= dist.x; if (left < 0) left += mapSize;
+			top    -= dist.y; if (top  < 0) top  += mapSize;
+			int newWidth  = width  + (int)(dist.x + dist.z);
+			int newHeight = height + (int)(dist.y + dist.w);
+			
+			// Reallocate plate data storage
+			float[] newHeightmap = new float[newWidth * newHeight];
+			int[] newSegmentOwnerMap = new int[newWidth * newHeight];
+			int[] newTimestampMap = new int[newWidth * newHeight];
+			
+			// Copy existing data over
+			for (int row = 0; row < height; row++) {
+				System.arraycopy(heightMap, row, newHeightmap, row, width);
+				System.arraycopy(segmentOwnerMap, row, newSegmentOwnerMap, row, width);
+				System.arraycopy(timestampMap, row, newTimestampMap, row, width);
+			}
+			
+			// Replace the old(now invalid) storage
+			height = newHeight; width = newWidth;
+			heightMap = newHeightmap;
+			segmentOwnerMap = newSegmentOwnerMap;
+			timestampMap = newTimestampMap;
+			
+			// Shift collision segment local coordinates
+			for (CollisionSegment seg:collisionSegments) {
+				seg.X0 += dist.x;
+				seg.X1 += dist.x;
+				seg.Y0 += dist.y;
+				seg.Y1 += dist.y;
+			}
+		}
+		mapTile = getMapIndex(worldX, worldY);
+		if (amount > 0 && heightMap[mapTile] > 0) {
+			timestampMap[mapTile] += timeStamp;
+			timestampMap[mapTile] /= 2;
+		} else if (amount > 0) {
+			timestampMap[mapTile] = timeStamp;
+		}
+		// Update mass
+		M -= heightMap[mapTile];
+		heightMap[mapTile] = amount;
+		M += heightMap[mapTile];
 	}
 	
 	/**
