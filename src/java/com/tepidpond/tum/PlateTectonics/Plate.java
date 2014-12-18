@@ -296,7 +296,77 @@ public class Plate {
 	 * @param lowerBound Sets limit below which there's no erosion. (Is this height limit? Mass?)
 	 */
 	void erode(float lowerBound) {
-		// TODO
+		float newHeightmap[] = new float[width * height];
+		Arrays.fill(newHeightmap, 0);
+		M = R_x = R_y = 0;
+		
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				int mapTile = y * width + x;
+				M += heightMap[mapTile];
+				newHeightmap[mapTile] += heightMap[mapTile];
+				
+				// Update R (center of mass)
+				R_x += x * heightMap[mapTile];
+				R_y += y * heightMap[mapTile];
+				if (heightMap[mapTile] < lowerBound)
+					continue;	// eroded too far already, no more
+				
+				int mapTileN = (y - 1) * width + x;
+				int mapTileS = (y + 1) * width + x;
+				int mapTileW = y * width + x - 1;
+				int mapTileE = y * width + x + 1;
+				float heightN = 0, heightS = 0, heightW = 0, heightE = 0;
+				if (y > 0)          heightN = heightMap[mapTileN];
+				if (y < height - 1) heightS = heightMap[mapTileS];
+				if (x > 0)          heightW = heightMap[mapTileW];
+				if (x < width - 1)  heightE = heightMap[mapTileE];
+				if (heightN + heightS + heightW + heightE == 0)
+					continue;	// no neighbors
+				
+				float diffN = heightMap[mapTile] - heightN;
+				float diffS = heightMap[mapTile] - heightS;
+				float diffW = heightMap[mapTile] - heightW;
+				float diffE = heightMap[mapTile] - heightE;
+				float minDiff = Math.min(Math.min(diffN, diffS), Math.min(diffW, diffE));
+				float diffSum = (heightN > 0 ? (diffN - minDiff) : 0.0f) + 
+								(heightS > 0 ? (diffS - minDiff) : 0.0f) + 
+								(heightW > 0 ? (diffW - minDiff) : 0.0f) + 
+								(heightE > 0 ? (diffE - minDiff) : 0.0f);
+				
+				if (diffSum < minDiff) {
+					newHeightmap[mapTileN] += (heightN > 0)?(diffN - minDiff):0;
+					newHeightmap[mapTileS] += (heightS > 0)?(diffS - minDiff):0;
+					newHeightmap[mapTileW] += (heightW > 0)?(diffW - minDiff):0;
+					newHeightmap[mapTileE] += (heightE > 0)?(diffE - minDiff):0;
+					newHeightmap[mapTile] -= diffSum;
+					minDiff -= diffSum;
+					minDiff /= 1 + (heightN > 0?1:0) + (heightS > 0?1:0) +
+					               (heightW > 0?1:0) + (heightE > 0?1:0);
+					
+					newHeightmap[mapTileN] += (heightN > 0)?(minDiff):0;
+					newHeightmap[mapTileS] += (heightS > 0)?(minDiff):0;
+					newHeightmap[mapTileW] += (heightW > 0)?(minDiff):0;
+					newHeightmap[mapTileE] += (heightE > 0)?(minDiff):0;
+				} else {
+					// Remove the erodable crust from the tile
+					newHeightmap[mapTile] -= minDiff;
+					float crustToShare = minDiff / diffSum;
+					// And spread it over the four neighbors.
+					newHeightmap[mapTileN] += crustToShare * (heightN > 0?diffN - minDiff:0);
+					newHeightmap[mapTileS] += crustToShare * (heightS > 0?diffS - minDiff:0);
+					newHeightmap[mapTileW] += crustToShare * (heightW > 0?diffW - minDiff:0);
+					newHeightmap[mapTileE] += crustToShare * (heightE > 0?diffE - minDiff:0);
+				}
+			}
+		}
+		// Save new eroded heights
+		heightMap = newHeightmap;
+		// Normalize center of mass
+		if (M > 0) {
+			R_x /= M;
+			R_y /= M;
+		}
 	}
 	
 	/**
