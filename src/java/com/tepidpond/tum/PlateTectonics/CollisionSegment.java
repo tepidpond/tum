@@ -8,5 +8,10 @@ public class CollisionSegment {
 		Area = area;
 		Collisions = 0;
 	}
-
+	public void UpdateBoundsToInclude(int x, int y) {
+		if (x < X0) X0 = x;
+		if (x > X1) X1 = x;
+		if (y < Y0) Y0 = y;
+		if (y > Y1) Y1 = y;
+	}
 }
