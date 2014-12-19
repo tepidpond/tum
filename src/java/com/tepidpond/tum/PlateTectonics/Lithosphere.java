@@ -85,7 +85,7 @@ public class Lithosphere {
 			
 			for (int y = Y0; y < Y1; y++) {
 				for (int x = X0; x < X1; x++) {
-					int plateTile = Util.getTile(x, y, p.getWidth());
+					int plateTile = Util.getTile(x - X0, y - Y0, p.getWidth());
 					int mapTile = Util.getTile(x, y, mapSize);
 					
 					// No crust at location.
