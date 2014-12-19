@@ -31,6 +31,7 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 			this.metaBig = new byte[16*16*256];
 			
 	    	lithos = new Lithosphere(512, 0.82f, 3, 0.5f, 5, 0.5f, 5, 9, seed);
+	    	lithos.Update();
 	}
 	
 	@Override

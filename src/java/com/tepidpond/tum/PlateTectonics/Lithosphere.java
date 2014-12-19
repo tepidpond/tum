@@ -8,6 +8,10 @@ public class Lithosphere {
 	private static final float SQRDMD_ROUGHNESS = 0.5f;
 	private static final float CONTINENTAL_BASE = 1.0f;
 	private static final float OCEANIC_BASE =     0.1f;
+	private static final float RESTART_ENERGY_RATIO = 0.15f;
+	private static final float RESTART_SPEED_LIMIT = 2.0f;
+	private static final int NO_COLLISION_TIME_LIMIT = 10;
+	private static final int MAX_GENERATIONS = 600;
 	
 	private float heightMap[];	// denotes height of terrain of tiles
 	private float indexMap[];	// denotes plate ownership of tiles
@@ -18,10 +22,16 @@ public class Lithosphere {
 	private int numPlates;
 	private Random rand;
 	
+	private float peakKineticEnergy = 0.0f;
+	private int lastCollisionCount = 0;
+	private int generations = 0;
+	private int erosionPeriod = 1;
+	
 	// default mapSize = 512. Must be power of 2.
 	public Lithosphere(int mapSize, float percentSeaTiles, int erosion_period, float folding_ratio,
 			int aggr_ratio_abs, float aggr_ratio_rel, int num_cycles, int _numPlates, long seed) {
 		
+		this.erosionPeriod = erosion_period;
 		this.mapArea = (int) Math.pow(mapSize + 1, 2);
 		this.mapSize = mapSize;
 		if (_numPlates > mapArea)
@@ -54,6 +64,75 @@ public class Lithosphere {
 		growPlates(plates);
 		Util.saveHeightmap(this.indexMap, mapSize, "plates");
 		this.plates = extractPlates(plates);
+	}
+	
+	public boolean Update() {
+		if (checkForStaticWorld()) return false;
+		
+		moveAndErodePlates();
+		Arrays.fill(heightMap, 0);
+		Arrays.fill(indexMap, 255);
+		int ageMap[] = new int[mapArea];
+		
+		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
+			Plate p = plates[activePlate];
+			int X0 = p.getLeft();
+			int X1 = p.getLeft() + p.getWidth();
+			int Y0 = p.getTop();
+			int Y1 = p.getTop() + p.getHeight();
+			float[] hmPlate = p.getHeightmap();
+			int[] agePlate = p.getTimestampMap();
+			
+			for (int y = Y0; y < Y1; y++) {
+				for (int x = X0; x < X1; x++) {
+					int plateTile = Util.getTile(x, y, p.getWidth());
+					int mapTile = Util.getTile(x, y, mapSize);
+					
+					// No crust at location.
+					if (hmPlate[plateTile] < (2 * Float.MIN_NORMAL))
+						continue;
+					
+					if (indexMap[mapTile] >= numPlates) {
+						heightMap[mapTile] = hmPlate[plateTile];
+						indexMap[mapTile] = activePlate;
+						ageMap[mapTile] = agePlate[plateTile];
+						
+						continue;
+					}
+					
+					
+				}
+			}
+		}
+		return true;
+	}
+	
+	private void moveAndErodePlates() {
+		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
+			plates[activePlate].resetSegments();	// reset collision segments
+			if (erosionPeriod > 0 && generations % erosionPeriod == 0)
+				plates[activePlate].erode(CONTINENTAL_BASE);
+			
+			plates[activePlate].move();
+		}
+	}
+	private boolean checkForStaticWorld() {
+		float totalVelocity = 0;
+		float totalKineticEnergy = 0;
+		
+		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
+			totalVelocity += plates[activePlate].getVelocity();
+			totalKineticEnergy += plates[activePlate].getMomentum();
+		}
+		if (totalKineticEnergy > peakKineticEnergy)
+			peakKineticEnergy = totalKineticEnergy;
+		if (totalVelocity < RESTART_SPEED_LIMIT ||
+			totalKineticEnergy / peakKineticEnergy < RESTART_ENERGY_RATIO ||
+			lastCollisionCount > NO_COLLISION_TIME_LIMIT ||
+			generations > MAX_GENERATIONS)
+			return true;
+		
+		return false;
 	}
 	
 	private PlateArea[] createPlates() {
