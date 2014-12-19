@@ -14,7 +14,7 @@ public class Plate {
 	private static final float CONT_BASE = 1.0f;
 	
 	private int activeContinentID;
-	private Vector<CollisionSegment> collisionSegments;
+	private Vector<CollisionSegment> collisionSegments = new Vector<CollisionSegment>();
 	
 	// Height of terrain on the plate.
 	private float[] heightMap;
@@ -62,6 +62,7 @@ public class Plate {
 		this.width = plateMapWidth;
 		this.height = heightMap.length / plateMapWidth;
 		this.rand = rand;
+		this.mapSize = mapSize;
 		
 		// Establish initial velocity and direction.
 		double angle = 2 * Math.PI * rand.nextDouble();
