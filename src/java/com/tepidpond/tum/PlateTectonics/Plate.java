@@ -608,7 +608,8 @@ public class Plate {
 	private int createSegment(int localX, int localY) {
 		int origin_index = localY * width + localX;
 		int newSegmentID = collisionSegments.size();
-		// Already exists a collision segment at the given coordinate
+		
+		// This tile already belongs to a collision segment
 		if (segmentOwnerMap[origin_index] < newSegmentID)
 			return segmentOwnerMap[origin_index];
 
@@ -617,16 +618,17 @@ public class Plate {
 		if (adjSegmentID < newSegmentID)
 			return adjSegmentID;
 				
-		List<Integer>[] spansTodo = (List<Integer>[]) new List[height];
+		// Setup to hold in-progress lines, as you do.
+		Stack<Integer>[] spansTodo = (Stack<Integer>[]) new Stack[height];
 		for(int i = 0; i < spansTodo.length; i++)
-		   spansTodo[i] = new ArrayList<Integer>();		
-		List<Integer>[] spansDone = (List<Integer>[]) new List[height];
+		   spansTodo[i] = new Stack<Integer>();		
+		Stack<Integer>[] spansDone = (Stack<Integer>[]) new Stack[height];
 		for(int i = 0; i < spansDone.length; i++)
-		   spansDone[i] = new ArrayList<Integer>();		
+		   spansDone[i] = new Stack<Integer>();		
 		
 		segmentOwnerMap[origin_index] = newSegmentID;
-		spansTodo[localY].add(localX);
-		spansTodo[localY].add(localX);
+		spansTodo[localY].Push(localX);
+		spansTodo[localY].Push(localX);
 		
 		CollisionSegment newSegment = new CollisionSegment(localX, localY, localX, localY, 1);
 		int linesProcessed = 0;
@@ -634,7 +636,7 @@ public class Plate {
 			linesProcessed = 0;
 			for (int line = 0; line < height; line++) {
 				int start, end;
-				if (spansTodo[line].size() == 0)
+				if (spansTodo[line].IsEmpty())
 					continue;
 								
 				if (start > end)
