@@ -1,6 +1,8 @@
 package com.tepidpond.tum.PlateTectonics;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 import java.util.Vector;
 
@@ -9,6 +11,7 @@ import org.lwjgl.util.vector.Vector4f;
 public class Plate {
 	private static final float DEFORMATION_WEIGHT = 5f;
 	private static final float INITIAL_SPEED = 1.0f;
+	private static final float CONT_BASE = 1.0f;
 	
 	private int activeContinentID;
 	private Vector<CollisionSegment> collisionSegments;
@@ -598,13 +601,90 @@ public class Plate {
 	 * Method analyzes the pixels 4-ways adjacent at the given location
 	 * and labels all connected continental points with the same segment ID.
 	 * 
-	 * @param x X coordinate on the local map.
-	 * @param y Y coordinate on the local map.
+	 * @param localX X coordinate on the local map.
+	 * @param localY Y coordinate on the local map.
 	 * @return ID of created segment on success, otherwise -1.
 	 */
-	private int createSegment(int x, int y) {
-		// TODO
-		return 0;
+	private int createSegment(int localX, int localY) {
+		int origin_index = localY * width + localX;
+		int newSegmentID = collisionSegments.size();
+		// Already exists a collision segment at the given coordinate
+		if (segmentOwnerMap[origin_index] < newSegmentID)
+			return segmentOwnerMap[origin_index];
+
+		// Is a neighboring tile part of an existing collision segment?
+		int adjSegmentID = checkNeighboringSegment(localX, localY);
+		if (adjSegmentID < newSegmentID)
+			return adjSegmentID;
+				
+		List<Integer>[] spansTodo = (List<Integer>[]) new List[height];
+		for(int i = 0; i < spansTodo.length; i++)
+		   spansTodo[i] = new ArrayList<Integer>();		
+		List<Integer>[] spansDone = (List<Integer>[]) new List[height];
+		for(int i = 0; i < spansDone.length; i++)
+		   spansDone[i] = new ArrayList<Integer>();		
+		
+		segmentOwnerMap[origin_index] = newSegmentID;
+		spansTodo[localY].add(localX);
+		spansTodo[localY].add(localX);
+		
+		CollisionSegment newSegment = new CollisionSegment(localX, localY, localX, localY, 1);
+		int linesProcessed = 0;
+		do {
+			linesProcessed = 0;
+			for (int line = 0; line < height; line++) {
+				int start, end;
+				if (spansTodo[line].size() == 0)
+					continue;
+								
+				if (start > end)
+					continue;
+				
+				// TODO
+				
+				spansDone[line].add(start);
+				spansDone[line].add(end);
+				linesProcessed++;
+			}
+		} while (linesProcessed > 0);
+
+		collisionSegments.addElement(newSegment);		
+		return newSegmentID;
+	}
+	
+	private int checkNeighboringSegment(int localX, int localY) {
+		int origin_index = localY * width + localX;
+
+		int newSegmentID = collisionSegments.size();
+		int adjTileSegmentID = newSegmentID;
+		if ((localX > 0) &&
+			heightMap[origin_index-1] >= CONT_BASE &&
+			segmentOwnerMap[origin_index-1] < newSegmentID) {
+			adjTileSegmentID = segmentOwnerMap[origin_index - 1];
+		} else if ((localX < width - 1) &&
+				heightMap[origin_index+1] >= CONT_BASE &&
+				segmentOwnerMap[origin_index+1] < newSegmentID) {
+				adjTileSegmentID = segmentOwnerMap[origin_index + 1];
+		} else if ((localY > 0) &&
+				heightMap[origin_index - width] >= CONT_BASE &&
+				segmentOwnerMap[origin_index - width] < newSegmentID) {
+				adjTileSegmentID = segmentOwnerMap[origin_index - width];
+		} else if ((localY < height - 1) &&
+				heightMap[origin_index + width] >= CONT_BASE &&
+				segmentOwnerMap[origin_index + width] < newSegmentID) {
+				adjTileSegmentID = segmentOwnerMap[origin_index + width];
+		}
+		if (adjTileSegmentID < newSegmentID) {
+			// A neighbor exists, this tile should be added to it instead
+			segmentOwnerMap[origin_index] = adjTileSegmentID;
+			CollisionSegment segment = collisionSegments.elementAt(adjTileSegmentID);
+			segment.Area++;
+			if (localX > segment.X0) segment.X0 = localX;
+			if (localX > segment.X1) segment.X1 = localX;
+			if (localY < segment.Y0) segment.Y0 = localY;
+			if (localY < segment.Y1) segment.Y1 = localY;
+		}		
+		return adjTileSegmentID;
 	}
 
 	/**
