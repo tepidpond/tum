@@ -618,38 +618,58 @@ public class Plate {
 		if (adjSegmentID < newSegmentID)
 			return adjSegmentID;
 				
-		// Setup to hold in-progress lines, as you do.
-		Stack<Integer>[] spansTodo = (Stack<Integer>[]) new Stack[height];
-		for(int i = 0; i < spansTodo.length; i++)
-		   spansTodo[i] = new Stack<Integer>();		
-		Stack<Integer>[] spansDone = (Stack<Integer>[]) new Stack[height];
-		for(int i = 0; i < spansDone.length; i++)
-		   spansDone[i] = new Stack<Integer>();		
-		
 		segmentOwnerMap[origin_index] = newSegmentID;
-		spansTodo[localY].Push(localX);
-		spansTodo[localY].Push(localX);
-		
 		CollisionSegment newSegment = new CollisionSegment(localX, localY, localX, localY, 1);
-		int linesProcessed = 0;
-		do {
-			linesProcessed = 0;
-			for (int line = 0; line < height; line++) {
-				int start, end;
-				if (spansTodo[line].IsEmpty())
-					continue;
-								
-				if (start > end)
-					continue;
-				
-				// TODO
-				
-				spansDone[line].add(start);
-				spansDone[line].add(end);
-				linesProcessed++;
+		
+		Stack<Integer> border = new Stack<Integer>();
+		border.Push(origin_index);
+		while (!border.IsEmpty()) {
+			// choose random location on border 
+			int borderIndex = rand.nextInt(border.size());
+			int mapTile = border.Peek(borderIndex);
+			
+			int x = Util.getX(mapTile, width);
+			int y = Util.getY(mapTile, width);
+			
+			// in the 4 cardinal directions, clamp at border.
+			int tileN, tileS, tileW, tileE;
+			tileN = Util.getTile(x, Math.max(y - 1, 0), width);
+			tileS = Util.getTile(x, Math.min(y + 1, height - 1), width);
+			tileW = Util.getTile(Math.max(x - 1, 0), y, width);
+			tileE = Util.getTile(Math.min(x + 1, width - 1), y, width);
+			
+			// If the N/S/E/W tile is un-owned, claim it for the active segment
+			// and add it to the border.
+			if (segmentOwnerMap[tileN] > newSegmentID && heightMap[tileN] >= CONT_BASE) {
+				segmentOwnerMap[tileN] = newSegmentID;
+				border.Push(tileN);
+				newSegment.Area++;
+				newSegment.UpdateBoundsToInclude(Util.getX(tileN, width), Util.getY(tileN, width));
 			}
-		} while (linesProcessed > 0);
-
+			if (segmentOwnerMap[tileS] > newSegmentID && heightMap[tileS] >= CONT_BASE) {
+				segmentOwnerMap[tileS] = newSegmentID;
+				border.Push(tileS);
+				newSegment.Area++;
+				newSegment.UpdateBoundsToInclude(Util.getX(tileS, width), Util.getY(tileS, width));
+			}
+			if (segmentOwnerMap[tileW] > newSegmentID && heightMap[tileW] >= CONT_BASE) {
+				segmentOwnerMap[tileW] = newSegmentID;
+				border.Push(tileW);
+				newSegment.Area++;
+				newSegment.UpdateBoundsToInclude(Util.getX(tileW, width), Util.getY(tileW, width));
+			}
+			if (segmentOwnerMap[tileE] > newSegmentID && heightMap[tileE] >= CONT_BASE) {
+				segmentOwnerMap[tileE] = newSegmentID;
+				border.Push(tileE);
+				newSegment.Area++;
+				newSegment.UpdateBoundsToInclude(Util.getX(tileE, width), Util.getY(tileE, width));
+			}
+			
+			// Overwrite processed point in border with last item from border
+			border.set(borderIndex, border.Peek());
+			border.Pop();
+		}
+		
 		collisionSegments.addElement(newSegment);		
 		return newSegmentID;
 	}
