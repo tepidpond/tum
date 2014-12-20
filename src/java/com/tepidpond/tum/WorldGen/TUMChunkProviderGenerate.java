@@ -3,14 +3,13 @@ package com.tepidpond.tum.WorldGen;
 import java.util.Arrays;
 import java.util.Random;
 
-import com.tepidpond.tum.PlateTectonics.Lithosphere;
-
 import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.gen.ChunkProviderGenerate;
-import net.minecraftforge.event.terraingen.WorldTypeEvent.BiomeSize;
+
+import com.tepidpond.tum.PlateTectonics.Lithosphere;
 
 public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 	private World worldObj;
@@ -29,9 +28,6 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 			this.idsTop = new Block[32768];
 			this.idsBig = new Block[16*16*256];
 			this.metaBig = new byte[16*16*256];
-			
-	    	lithos = new Lithosphere(512, 0.82f, 3, 0.5f, 5, 0.5f, 5, 9, seed);
-	    	lithos.Update();
 	}
 	
 	@Override

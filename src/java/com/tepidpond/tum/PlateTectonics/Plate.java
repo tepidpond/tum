@@ -1,8 +1,6 @@
 package com.tepidpond.tum.PlateTectonics;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Random;
 import java.util.Vector;
 
@@ -49,18 +47,18 @@ public class Plate {
 	float getVelocityY() {return vY;}
 	Boolean isEmpty()    {return M<=0;} 
 
-	public Plate(float[] heightMap, int plateMapWidth, int xOrigin, int yOrigin, int plateAge, int mapSize, Random rand) {
-		if (heightMap.length < 1) return;
+	public Plate(float[] plateData, int plateMapWidth, int xOrigin, int yOrigin, int plateAge, int mapSize, Random rand) {
+		if (plateData.length < 1) return;
 		
 		// Save basic pre-defined data.
-		this.heightMap = new float[heightMap.length];
-		this.timestampMap = new int[heightMap.length];
-		this.segmentOwnerMap = new int[heightMap.length];
+		this.heightMap = new float[plateData.length];
+		this.timestampMap = new int[plateData.length];
+		this.segmentOwnerMap = new int[plateData.length];
 		Arrays.fill(segmentOwnerMap, 255);
 		this.left = xOrigin;
 		this.top = yOrigin;
 		this.width = plateMapWidth;
-		this.height = heightMap.length / plateMapWidth;
+		this.height = plateData.length / plateMapWidth;
 		this.rand = rand;
 		this.mapSize = mapSize;
 		
@@ -74,18 +72,17 @@ public class Plate {
 		
 		// Clone heightMap data, calculate center of mass and total mass.
 		int tileIndex = 0; float activeTile = 0.0f; 
+		System.arraycopy(plateData, 0, heightMap, 0, plateData.length);
 		for(int x = 0; x<width; x++) {
 			for (int y=0; y<height; y++) {
+				tileIndex = y * width + x;
 				activeTile = heightMap[tileIndex];
 				R_x += x * activeTile;
 				R_y += y * activeTile;
 				M += activeTile;
 				
-				this.heightMap[tileIndex] = activeTile;
 				if (activeTile > 0.0f)
 					this.timestampMap[tileIndex] = plateAge;
-				
-				activeTile++;
 			}
 		}
 		
@@ -316,10 +313,11 @@ public class Plate {
 				if (heightMap[mapTile] < lowerBound)
 					continue;	// eroded too far already, no more
 				
-				int mapTileN = (y - 1) * width + x;
-				int mapTileS = (y + 1) * width + x;
-				int mapTileW = y * width + x - 1;
-				int mapTileE = y * width + x + 1;
+				int mapTileN = Math.max(0, (y - 1)) * width + x;
+				int mapTileS = Math.min(height - 1, (y + 1)) * width + x;
+				int mapTileW = y * width + Math.max(0, x - 1);
+				int mapTileE = y * width + Math.min(width - 1, x + 1);
+				
 				float heightN = 0, heightS = 0, heightW = 0, heightE = 0;
 				if (y > 0)          heightN = heightMap[mapTileN];
 				if (y < height - 1) heightS = heightMap[mapTileS];

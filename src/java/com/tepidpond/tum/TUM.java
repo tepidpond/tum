@@ -3,6 +3,7 @@ package com.tepidpond.tum;
 import net.minecraft.world.WorldType;
 import net.minecraftforge.common.MinecraftForge;
 
+import com.tepidpond.tum.PlateTectonics.Lithosphere;
 import com.tepidpond.tum.WorldGen.TUMWorldType;
 
 import cpw.mods.fml.client.FMLClientHandler;
@@ -20,6 +21,11 @@ public class TUM
     @EventHandler
     public void preInit(FMLInitializationEvent event)
     {
+    	Lithosphere lithos = new Lithosphere(512, 0.82f, 3, 0.5f, 5, 0.5f, 5, 9, 0);
+    	for (int i=0; i<256; i++) {
+    		lithos.Update();
+    	}
+    	System.exit(0);
     }
     
     @EventHandler

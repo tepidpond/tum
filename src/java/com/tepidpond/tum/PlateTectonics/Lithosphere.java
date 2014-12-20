@@ -27,6 +27,14 @@ public class Lithosphere {
 	private int generations = 0;
 	private int erosionPeriod = 1;
 	
+	public float[] getHeightmap() {
+		return heightMap;
+	}
+	
+	public int getMapSize() {
+		return mapSize;
+	}
+	
 	// default mapSize = 512. Must be power of 2.
 	public Lithosphere(int mapSize, float percentSeaTiles, int erosion_period, float folding_ratio,
 			int aggr_ratio_abs, float aggr_ratio_rel, int num_cycles, int _numPlates, long seed) {
@@ -80,7 +88,7 @@ public class Lithosphere {
 			int X1 = p.getLeft() + p.getWidth();
 			int Y0 = p.getTop();
 			int Y1 = p.getTop() + p.getHeight();
-			float[] hmPlate = p.getHeightmap();
+			float[] hmPlate = p.getHeightmap();			
 			int[] agePlate = p.getTimestampMap();
 			
 			for (int y = Y0; y < Y1; y++) {
@@ -99,11 +107,11 @@ public class Lithosphere {
 						
 						continue;
 					}
-					
-					
 				}
 			}
 		}
+		
+		Util.saveHeightmap(heightMap, mapSize, "upd" + Integer.toString(generations++));
 		return true;
 	}
 	
