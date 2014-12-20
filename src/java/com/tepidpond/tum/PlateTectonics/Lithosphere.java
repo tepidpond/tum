@@ -13,8 +13,8 @@ public class Lithosphere {
 	private static final int NO_COLLISION_TIME_LIMIT = 10;
 	private static final int MAX_GENERATIONS = 600;
 	
-	private float heightMap[];	// denotes height of terrain of tiles
-	private float indexMap[];	// denotes plate ownership of tiles
+	private float heightMap[];  // denotes height of terrain of tiles
+	private float indexMap[];   // denotes plate ownership of tiles. Is a float because of saveHeightmap.
 	private Plate plates[];
 	
 	private int mapArea;
@@ -107,6 +107,61 @@ public class Lithosphere {
 						
 						continue;
 					}
+					
+					
+					
+					
+					// DO NOT ACCEPT HEIGHT EQUALITY! Equality leads to subduction
+					// of shore that 's barely above sea level. It's a lot less
+					// serious problem to treat very shallow waters as continent...
+					boolean prev_is_oceanic = heightMap[mapTile] < CONTINENTAL_BASE;
+					boolean this_is_oceanic = hmPlate[plateTile] < CONTINENTAL_BASE;
+
+					int prev_timestamp = plates[(int) indexMap[mapTile]].getCrustTimestamp(x, y);
+					int this_timestamp = ageMap[mapTile];
+					boolean prev_is_bouyant = (heightMap[mapTile] > hmPlate[plateTile]) |
+						(heightMap[mapTile] + 2 * Float.MIN_NORMAL > hmPlate[plateTile]) &
+						 (heightMap[mapTile] < 2 * Float.MIN_NORMAL + hmPlate[plateTile]) &
+						 (prev_timestamp >= this_timestamp);
+
+					// Handle subduction of oceanic crust as special case.
+					if (this_is_oceanic & prev_is_bouyant)
+					{
+						// This plate will be the subducting one.
+						// The level of effect that subduction has
+						// is directly related to the amount of water
+						// on top of the subducting plate.
+						float sediment = OCEANIC_BASE *
+							(CONTINENTAL_BASE - hmPlate[plateTile]) /
+							CONTINENTAL_BASE;
+
+						// Save collision to the receiving plate's list.
+						PlateCollision coll(i, x_mod, y_mod, sediment);
+						subductions[imap[k]].push_back(coll);
+						++oceanic_collisions;
+
+						// Remove subducted oceanic lithosphere from plate.
+						// This is crucial for
+						// a) having correct amount of colliding crust (below)
+						// b) protecting subducted locations from receiving
+						//    crust from other subductions/collisions.
+						plates[i]->setCrust(x_mod, y_mod, this_map[j] -
+							OCEANIC_BASE, this_timestamp);
+
+						if (this_map[j] <= 0)
+							continue; // Nothing more to collide.
+					}					
+					
+					
+					
+					
+					
+					
+					
+					
+					
+					
+					
 				}
 			}
 		}
