@@ -16,6 +16,8 @@ public class Lithosphere {
 	private float heightMap[];  // denotes height of terrain of tiles
 	private float indexMap[];   // denotes plate ownership of tiles. Is a float because of saveHeightmap.
 	private Plate plates[];
+	private Stack<CollisionDetails> subductions[];
+	private Stack<CollisionDetails> collisions[];
 	
 	private int mapArea;
 	private int mapSize;
@@ -26,6 +28,7 @@ public class Lithosphere {
 	private int lastCollisionCount = 0;
 	private int generations = 0;
 	private int erosionPeriod = 1;
+	private float foldingRatio = 0.5f;
 	
 	public float[] getHeightmap() {
 		return heightMap;
@@ -38,7 +41,11 @@ public class Lithosphere {
 	// default mapSize = 512. Must be power of 2.
 	public Lithosphere(int mapSize, float percentSeaTiles, int erosion_period, float folding_ratio,
 			int aggr_ratio_abs, float aggr_ratio_rel, int num_cycles, int _numPlates, long seed) {
-		
+
+		subductions = (Stack<CollisionDetails>[]) new Object[numPlates];
+		collisions = (Stack<CollisionDetails>[]) new Object[numPlates];
+
+		this.foldingRatio = folding_ratio;
 		this.erosionPeriod = erosion_period;
 		this.mapArea = (int) Math.pow(mapSize + 1, 2);
 		this.mapSize = mapSize;
@@ -78,6 +85,7 @@ public class Lithosphere {
 		if (checkForStaticWorld()) return false;
 		
 		moveAndErodePlates();
+		int oceanicCollisions = 0, continentalCollisions = 0;
 		Arrays.fill(heightMap, 0);
 		Arrays.fill(indexMap, 255);
 		int ageMap[] = new int[mapArea];
@@ -91,79 +99,22 @@ public class Lithosphere {
 			float[] hmPlate = p.getHeightmap();			
 			int[] agePlate = p.getTimestampMap();
 			
-			for (int y = Y0; y < Y1; y++) {
-				for (int x = X0; x < X1; x++) {
-					int plateTile = Util.getTile(x - X0, y - Y0, p.getWidth());
-					int mapTile = Util.getTile(x, y, mapSize);
-					
-					// No crust at location.
-					if (hmPlate[plateTile] < (2 * Float.MIN_NORMAL))
-						continue;
-					
-					if (indexMap[mapTile] >= numPlates) {
-						heightMap[mapTile] = hmPlate[plateTile];
-						indexMap[mapTile] = activePlate;
-						ageMap[mapTile] = agePlate[plateTile];
-						
-						continue;
-					}
-					
-					
-					
-					
-					// DO NOT ACCEPT HEIGHT EQUALITY! Equality leads to subduction
-					// of shore that 's barely above sea level. It's a lot less
-					// serious problem to treat very shallow waters as continent...
-					boolean prev_is_oceanic = heightMap[mapTile] < CONTINENTAL_BASE;
-					boolean this_is_oceanic = hmPlate[plateTile] < CONTINENTAL_BASE;
-
-					int prev_timestamp = plates[(int) indexMap[mapTile]].getCrustTimestamp(x, y);
-					int this_timestamp = ageMap[mapTile];
-					boolean prev_is_bouyant = (heightMap[mapTile] > hmPlate[plateTile]) |
-						(heightMap[mapTile] + 2 * Float.MIN_NORMAL > hmPlate[plateTile]) &
-						 (heightMap[mapTile] < 2 * Float.MIN_NORMAL + hmPlate[plateTile]) &
-						 (prev_timestamp >= this_timestamp);
-
-					// Handle subduction of oceanic crust as special case.
-					if (this_is_oceanic & prev_is_bouyant)
-					{
-						// This plate will be the subducting one.
-						// The level of effect that subduction has
-						// is directly related to the amount of water
-						// on top of the subducting plate.
-						float sediment = OCEANIC_BASE *
-							(CONTINENTAL_BASE - hmPlate[plateTile]) /
-							CONTINENTAL_BASE;
-
-						// Save collision to the receiving plate's list.
-						PlateCollision coll(i, x_mod, y_mod, sediment);
-						subductions[imap[k]].push_back(coll);
-						++oceanic_collisions;
-
-						// Remove subducted oceanic lithosphere from plate.
-						// This is crucial for
-						// a) having correct amount of colliding crust (below)
-						// b) protecting subducted locations from receiving
-						//    crust from other subductions/collisions.
-						plates[i]->setCrust(x_mod, y_mod, this_map[j] -
-							OCEANIC_BASE, this_timestamp);
-
-						if (this_map[j] <= 0)
-							continue; // Nothing more to collide.
-					}					
-					
-					
-					
-					
-					
-					
-					
-					
-					
-					
-					
-				}
+			for (int y = Y0; y < Y1; y++) for (int x = X0; x < X1; x++) {
+				int collisionFlag = collectCollisions(ageMap, activePlate, x, y);
+				if ((collisionFlag & 1) != 0) continentalCollisions++;
+				if ((collisionFlag & 2) != 0) oceanicCollisions++;
 			}
+		}
+		
+		if (continentalCollisions == 0) lastCollisionCount++; else lastCollisionCount = 0;
+		
+		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
+			for (CollisionDetails cd: subductions[activePlate]) {
+				plates[activePlate].addCrustBySubduction(
+						cd.getX(), cd.getY(), cd.getCrust(), generations,
+						plates[cd.getIndex()].getVelocityX(), plates[cd.getIndex()].getVelocityY());
+			}
+			subductions[activePlate].clear();
 		}
 		
 		Util.saveHeightmap(heightMap, mapSize, "upd" + Integer.toString(generations++));
@@ -179,6 +130,7 @@ public class Lithosphere {
 			plates[activePlate].move();
 		}
 	}
+	
 	private boolean checkForStaticWorld() {
 		float totalVelocity = 0;
 		float totalKineticEnergy = 0;
@@ -196,6 +148,117 @@ public class Lithosphere {
 			return true;
 		
 		return false;
+	}
+	
+	private int collectCollisions(int[] ageMap, int activePlate, int x, int y) {
+		int collisionFlags = 0;
+		Plate p = plates[activePlate];
+		float hmPlate[] = p.getHeightmap();
+		int agePlate[] = p.getTimestampMap();
+		
+		int plateTile = Util.getTile(x - p.getLeft(), y - p.getTop(), p.getWidth());
+		int mapTile = Util.getTile(x, y, mapSize);
+		
+		// No crust at location.
+		if (hmPlate[plateTile] < (2 * Float.MIN_NORMAL))
+			return collisionFlags;
+		
+		if (indexMap[mapTile] >= numPlates) {
+			heightMap[mapTile] = hmPlate[plateTile];
+			indexMap[mapTile] = activePlate;
+			ageMap[mapTile] = agePlate[plateTile];
+			
+			return collisionFlags;
+		}
+		
+		// DO NOT ACCEPT HEIGHT EQUALITY! Equality leads to subduction
+		// of shore that 's barely above sea level. It's a lot less
+		// serious problem to treat very shallow waters as continent...
+		boolean prev_is_oceanic = heightMap[mapTile] < CONTINENTAL_BASE;
+		boolean this_is_oceanic = hmPlate[plateTile] < CONTINENTAL_BASE;
+
+		int prev_timestamp = plates[(int) indexMap[mapTile]].getCrustTimestamp(x, y);
+		int this_timestamp = ageMap[mapTile];
+		boolean prev_is_bouyant = (heightMap[mapTile] > hmPlate[plateTile]) |
+			(heightMap[mapTile] + 2 * Float.MIN_NORMAL > hmPlate[plateTile]) &
+			 (heightMap[mapTile] < 2 * Float.MIN_NORMAL + hmPlate[plateTile]) &
+			 (prev_timestamp >= this_timestamp);
+
+		// Handle subduction of oceanic crust as special case.
+		if (this_is_oceanic & prev_is_bouyant)
+		{
+			// This plate will be the subducting one.
+			// The level of effect that subduction has
+			// is directly related to the amount of water
+			// on top of the subducting plate.
+			float sediment = OCEANIC_BASE * (CONTINENTAL_BASE - hmPlate[plateTile]) / CONTINENTAL_BASE;
+
+			// Save collision to the receiving plate's list.
+			subductions[(int) indexMap[mapTile]].Push(
+					new CollisionDetails(activePlate, x, y, sediment));
+			collisionFlags |= 2;	// oceanic
+
+			// Remove subducted oceanic lithosphere from plate.
+			// This is crucial for
+			// a) having correct amount of colliding crust (below)
+			// b) protecting subducted locations from receiving
+			//    crust from other subductions/collisions.
+			plates[activePlate].setCrust(x, y, hmPlate[plateTile] - OCEANIC_BASE, this_timestamp);
+
+			if (hmPlate[plateTile] <= 0)
+				return collisionFlags; // Nothing more to collide.
+		} else if (prev_is_oceanic) {
+			float sediment = OCEANIC_BASE * (CONTINENTAL_BASE - heightMap[mapTile]) / CONTINENTAL_BASE;
+
+			subductions[(int) indexMap[mapTile]].Push(
+					new CollisionDetails(activePlate, x, y, sediment));
+			collisionFlags |= 2;	// oceanic
+
+			plates[activePlate].setCrust(x, y, heightMap[mapTile] - OCEANIC_BASE, this_timestamp);
+
+			heightMap[mapTile] -= OCEANIC_BASE;
+
+			if (heightMap[mapTile] <= 0)
+			{
+				indexMap[mapTile] = activePlate;
+				heightMap[mapTile] = hmPlate[plateTile];
+				ageMap[mapTile] = agePlate[plateTile];
+
+				return collisionFlags;
+			}
+		}
+		
+		// Record collisions to both plates. This also creates
+		// continent segment at the collided location to plates.
+		int this_area = plates[activePlate].addCollision(x, y);
+		int prev_area = plates[(int) indexMap[mapTile]].addCollision(x, y);
+		
+		if (this_area < prev_area) {
+			CollisionDetails cd = new CollisionDetails((int) indexMap[mapTile], x, y, hmPlate[plateTile] * foldingRatio);
+
+				// Give some...
+			heightMap[mapTile] += cd.getCrust();
+			plates[(int) indexMap[mapTile]].setCrust(x, y, heightMap[mapTile], agePlate[plateTile]);
+
+			// And take some.
+			plates[activePlate].setCrust(x, y, hmPlate[plateTile] * (1.0f - foldingRatio), agePlate[plateTile]);
+
+			// Add collision to the earlier plate's list.
+			collisions[activePlate].Push(cd);
+			collisionFlags |= 1;	// continental
+		} else {
+			CollisionDetails cd = new CollisionDetails(activePlate, x, y, heightMap[mapTile] * foldingRatio);
+			plates[activePlate].setCrust(x, y, hmPlate[plateTile] + cd.getCrust(), ageMap[mapTile]);
+			plates[(int) indexMap[mapTile]].setCrust(x, y, heightMap[mapTile] * (1.0f - foldingRatio), ageMap[mapTile]);
+			collisions[(int) indexMap[mapTile]].Push(cd);
+			collisionFlags |= 1;	// continental
+
+			// Give the location to the larger plate.
+			heightMap[mapTile] = hmPlate[plateTile];
+			heightMap[mapTile] = activePlate;
+			ageMap[mapTile] = agePlate[plateTile];
+		}
+		return collisionFlags;
 	}
 	
 	private PlateArea[] createPlates() {
