@@ -518,9 +518,9 @@ public class Plate {
 		worldX &= mapSize - 1; worldY &= mapSize - 1;	// Just to be safe
 		
 		int localX = getOffsetX(worldX), localY = getOffsetY(worldY);
-		int mapTile = getMapIndex(worldX, worldY);
+		int plateTile = getMapIndex(worldX, worldY);
 		
-		if (mapTile >= width * height) {
+		if (plateTile >= width * height) {
 			// Bounds of this plate
 			Vector4f bounds = new Vector4f(left, top, left + width - 1, top + height - 1);
 			// Distance from each edge for the new crust piece.
@@ -533,10 +533,10 @@ public class Plate {
 			
 			// Add new tile to nearest plate border
 			dist = new Vector4f(
-					dist.x * (dist.x <  dist.z ? 1 : 0) * (dist.x < mapSize ? 1 : 0),
-					dist.y * (dist.y <  dist.w ? 1 : 0) * (dist.y < mapSize ? 1 : 0),
-					dist.z * (dist.z <= dist.x ? 1 : 0) * (dist.z < mapSize ? 1 : 0),
-					dist.w * (dist.w <= dist.y ? 1 : 0) * (dist.w < mapSize ? 1 : 0)
+					dist.x * (dist.x >=0 && dist.x <  dist.z ? 1 : 0) * (dist.x < mapSize ? 1 : 0),
+					dist.y * (dist.y >=0 && dist.y <  dist.w ? 1 : 0) * (dist.y < mapSize ? 1 : 0),
+					dist.z * (dist.z >=0 && dist.z <= dist.x ? 1 : 0) * (dist.z < mapSize ? 1 : 0),
+					dist.w * (dist.w >=0 && dist.w <= dist.y ? 1 : 0) * (dist.w < mapSize ? 1 : 0)
 			);
 			// Force growth in 8 tile blocks (optimization maybe?)
 			if (false) {
@@ -593,17 +593,17 @@ public class Plate {
 				seg.Y1 += dist.y;
 			}
 		}
-		mapTile = getMapIndex(worldX, worldY);
-		if (amount > 0 && heightMap[mapTile] > 0) {
-			timestampMap[mapTile] += timeStamp;
-			timestampMap[mapTile] /= 2;
+		plateTile = getMapIndex(worldX, worldY);
+		if (amount > 0 && heightMap[plateTile] > 0) {
+			timestampMap[plateTile] += timeStamp;
+			timestampMap[plateTile] /= 2;
 		} else if (amount > 0) {
-			timestampMap[mapTile] = timeStamp;
+			timestampMap[plateTile] = timeStamp;
 		}
 		// Update mass
-		M -= heightMap[mapTile];
-		heightMap[mapTile] = amount;
-		M += heightMap[mapTile];
+		M -= heightMap[plateTile];
+		heightMap[plateTile] = amount;
+		M += heightMap[plateTile];
 	}
 	
 	/**
