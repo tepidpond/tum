@@ -489,7 +489,7 @@ public class Plate {
 	 */
 	void resetSegments() {
 		collisionSegments.removeAllElements();
-		Arrays.fill(segmentOwnerMap, -1);
+		Arrays.fill(segmentOwnerMap, 255);
 	}
 	
 	/**
@@ -719,16 +719,14 @@ public class Plate {
 		return (getOffsetY(y) * width + getOffsetX(x));
 	}
 	private int getOffsetX(int x) {
-		// Wrap around the world map.
-		while (x < 0)       x += mapSize;
-		while (x > mapSize) x -= mapSize;
+		x &= mapSize - 1;           // scale within map dimensions
+		if (x < left) x += mapSize; // wrap around world edge if necessary
 		x -= this.left;
 		return x;
 	}
 	private int getOffsetY(int y) {
-		// Wrap around the world map.
-		while (y < 0)       y += mapSize;
-		while (y > mapSize) y -= mapSize;
+		y &= mapSize - 1;           // scale within map dimensions
+		if (y < top) y += mapSize;  // wrap around world edge if necessary
 		y -= this.top;
 		return y;
 	}

@@ -1,5 +1,6 @@
 package com.tepidpond.tum.PlateTectonics;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Random;
@@ -30,20 +31,14 @@ public class Lithosphere {
 	private int erosionPeriod = 1;
 	private float foldingRatio = 0.5f;
 	
-	public float[] getHeightmap() {
-		return heightMap;
-	}
+	public float[] getHeightmap() { return heightMap; }
 	
-	public int getMapSize() {
-		return mapSize;
-	}
+	public int getMapSize() { return mapSize; }
 	
 	// default mapSize = 512. Must be power of 2.
 	public Lithosphere(int mapSize, float percentSeaTiles, int erosion_period, float folding_ratio,
 			int aggr_ratio_abs, float aggr_ratio_rel, int num_cycles, int _numPlates, long seed) {
 
-		subductions = (Stack<CollisionDetails>[]) new Object[numPlates];
-		collisions = (Stack<CollisionDetails>[]) new Object[numPlates];
 
 		this.foldingRatio = folding_ratio;
 		this.erosionPeriod = erosion_period;
@@ -56,6 +51,15 @@ public class Lithosphere {
 		this.rand = new Random();
 		rand.setSeed(seed);
 		
+		// Setup for collision storage for update. This is complex because
+		// "Cannot create generic array of ..." error otherwise.
+		subductions = (Stack<CollisionDetails>[]) new Stack[numPlates];	
+		collisions = (Stack<CollisionDetails>[]) new Stack[numPlates];
+		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
+			subductions[activePlate] = new Stack<CollisionDetails>();
+			collisions[activePlate] = new Stack<CollisionDetails>();
+		}
+
 		float tmpHeightMap[] = new float[mapArea];
 		
 		// Generate initial fractal map
@@ -69,7 +73,7 @@ public class Lithosphere {
 		
 		this.heightMap = new float[(int)Math.pow(mapSize, 2)];
 		this.indexMap = new float[(int)Math.pow(mapSize, 2)];
-		Arrays.fill(indexMap, numPlates + 1);
+		Arrays.fill(indexMap, numPlates);
 		
 		for (int i = 0; i < mapSize; i++)
 			System.arraycopy(tmpHeightMap, i * (mapSize + 1), this.heightMap, i * mapSize, mapSize);
@@ -87,7 +91,7 @@ public class Lithosphere {
 		moveAndErodePlates();
 		int oceanicCollisions = 0, continentalCollisions = 0;
 		Arrays.fill(heightMap, 0);
-		Arrays.fill(indexMap, 255);
+		Arrays.fill(indexMap, numPlates);
 		int ageMap[] = new int[mapArea];
 		
 		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
@@ -279,7 +283,7 @@ public class Lithosphere {
 	}
 	
 	private void growPlates(PlateArea[] plates) {
-		Arrays.fill(indexMap, numPlates * 2);	// initialize terrain-ownership map
+		Arrays.fill(indexMap, numPlates);	// initialize terrain-ownership map
 		
 		int maxBorder = 1;
 		while (maxBorder > 0) {
@@ -338,14 +342,14 @@ public class Lithosphere {
 			int y0 = plateAreas[activePlate].y0;
 			int y1 = plateAreas[activePlate].y1;
 			float[] plateHM = new float[(x1 - x0) * (y1 - y0)];
-			int i = 0;
 			for (int y = plateAreas[activePlate].y0; y < plateAreas[activePlate].y1; y++) {
 				for (int x = plateAreas[activePlate].x0; x < plateAreas[activePlate].x1; x++) {
-					int k = Util.getTile(x, y, mapSize);
-					if (indexMap[k] == activePlate) {
-						plateHM[i++] = heightMap[k];
+					int mapTile = Util.getTile(x, y, mapSize);
+					int plateTile = Util.getTile(x - x0, y - y0, x1 - x0);
+					if (indexMap[mapTile] == activePlate) {
+						plateHM[plateTile] = heightMap[mapTile];
 					} else {
-						plateHM[i++] = 0;
+						plateHM[plateTile] = 0;
 					}
 				}
 			}
