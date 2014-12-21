@@ -13,6 +13,9 @@ public class Lithosphere {
 	private static final float RESTART_SPEED_LIMIT = 2.0f;
 	private static final int NO_COLLISION_TIME_LIMIT = 10;
 	private static final int MAX_GENERATIONS = 600;
+	private static final boolean REGENERATE_CRUST = true;
+	private static final float BUOYANCY_BONUS = 3.0f;
+	private static final int MAX_BUOYANCY_AGE = 20;
 	
 	private float heightMap[];  // denotes height of terrain of tiles
 	private float indexMap[];   // denotes plate ownership of tiles. Is a float because of saveHeightmap.
@@ -30,6 +33,8 @@ public class Lithosphere {
 	private int generations = 0;
 	private int erosionPeriod = 1;
 	private float foldingRatio = 0.5f;
+	private float aggr_ratio_abs = 0.5f;
+	private float aggr_ratio_rel = 0.5f;
 	
 	public float[] getHeightmap() { return heightMap; }
 	
@@ -40,6 +45,8 @@ public class Lithosphere {
 			int aggr_ratio_abs, float aggr_ratio_rel, int num_cycles, int _numPlates, long seed) {
 
 
+		this.aggr_ratio_abs = aggr_ratio_abs;
+		this.aggr_ratio_rel = aggr_ratio_rel;
 		this.foldingRatio = folding_ratio;
 		this.erosionPeriod = erosion_period;
 		this.mapArea = (int) Math.pow(mapSize + 1, 2);
@@ -89,7 +96,9 @@ public class Lithosphere {
 		if (checkForStaticWorld()) return false;
 		
 		moveAndErodePlates();
-		int oceanicCollisions = 0, continentalCollisions = 0;
+		int continentalCollisions = 0;
+		float prevIndexMap[] = new float[indexMap.length];
+		System.arraycopy(indexMap, 0, prevIndexMap, 0, indexMap.length);
 		Arrays.fill(heightMap, 0);
 		Arrays.fill(indexMap, numPlates);
 		int ageMap[] = new int[mapArea];
@@ -104,24 +113,18 @@ public class Lithosphere {
 			int[] agePlate = p.getTimestampMap();
 			
 			for (int y = Y0; y < Y1; y++) for (int x = X0; x < X1; x++) {
-				int collisionFlag = collectCollisions(ageMap, activePlate, x, y);
-				if ((collisionFlag & 1) != 0) continentalCollisions++;
-				if ((collisionFlag & 2) != 0) oceanicCollisions++;
+				continentalCollisions += collectCollisions(ageMap, activePlate, x, y);
 			}
 		}
 		
 		if (continentalCollisions == 0) lastCollisionCount++; else lastCollisionCount = 0;
+		processSubductions();
+		processCollisions();
+		regenerateCrust(prevIndexMap, ageMap);
+		addSeaFloorUplift(ageMap);
+		generations++;
 		
-		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
-			for (CollisionDetails cd: subductions[activePlate]) {
-				plates[activePlate].addCrustBySubduction(
-						cd.getX(), cd.getY(), cd.getCrust(), generations,
-						plates[cd.getIndex()].getVelocityX(), plates[cd.getIndex()].getVelocityY());
-			}
-			subductions[activePlate].clear();
-		}
-		
-		Util.saveHeightmap(heightMap, mapSize, "upd" + Integer.toString(generations++));
+		Util.saveHeightmap(heightMap, mapSize, "upd" + Integer.toString(generations));
 		return true;
 	}
 	
@@ -155,7 +158,6 @@ public class Lithosphere {
 	}
 	
 	private int collectCollisions(int[] ageMap, int activePlate, int x, int y) {
-		int collisionFlags = 0;
 		Plate p = plates[activePlate];
 		float hmPlate[] = p.getHeightmap();
 		int agePlate[] = p.getTimestampMap();
@@ -165,14 +167,14 @@ public class Lithosphere {
 		
 		// No crust at location.
 		if (hmPlate[plateTile] < (2 * Float.MIN_NORMAL))
-			return collisionFlags;
+			return 0;
 		
 		if (indexMap[mapTile] >= numPlates) {
 			heightMap[mapTile] = hmPlate[plateTile];
 			indexMap[mapTile] = activePlate;
 			ageMap[mapTile] = agePlate[plateTile];
 			
-			return collisionFlags;
+			return 0;
 		}
 		
 		// DO NOT ACCEPT HEIGHT EQUALITY! Equality leads to subduction
@@ -200,7 +202,6 @@ public class Lithosphere {
 			// Save collision to the receiving plate's list.
 			subductions[(int) indexMap[mapTile]].Push(
 					new CollisionDetails(activePlate, x, y, sediment));
-			collisionFlags |= 2;	// oceanic
 
 			// Remove subducted oceanic lithosphere from plate.
 			// This is crucial for
@@ -210,13 +211,12 @@ public class Lithosphere {
 			plates[activePlate].setCrust(x, y, hmPlate[plateTile] - OCEANIC_BASE, this_timestamp);
 
 			if (hmPlate[plateTile] <= 0)
-				return collisionFlags; // Nothing more to collide.
+				return 0;
 		} else if (prev_is_oceanic) {
 			float sediment = OCEANIC_BASE * (CONTINENTAL_BASE - heightMap[mapTile]) / CONTINENTAL_BASE;
 
 			subductions[(int) indexMap[mapTile]].Push(
 					new CollisionDetails(activePlate, x, y, sediment));
-			collisionFlags |= 2;	// oceanic
 
 			plates[activePlate].setCrust(x, y, heightMap[mapTile] - OCEANIC_BASE, this_timestamp);
 
@@ -228,7 +228,7 @@ public class Lithosphere {
 				heightMap[mapTile] = hmPlate[plateTile];
 				ageMap[mapTile] = agePlate[plateTile];
 
-				return collisionFlags;
+				return 0;
 			}
 		}
 		
@@ -249,20 +249,77 @@ public class Lithosphere {
 
 			// Add collision to the earlier plate's list.
 			collisions[activePlate].Push(cd);
-			collisionFlags |= 1;	// continental
 		} else {
 			CollisionDetails cd = new CollisionDetails(activePlate, x, y, heightMap[mapTile] * foldingRatio);
 			plates[activePlate].setCrust(x, y, hmPlate[plateTile] + cd.getCrust(), ageMap[mapTile]);
 			plates[(int) indexMap[mapTile]].setCrust(x, y, heightMap[mapTile] * (1.0f - foldingRatio), ageMap[mapTile]);
 			collisions[(int) indexMap[mapTile]].Push(cd);
-			collisionFlags |= 1;	// continental
 
 			// Give the location to the larger plate.
 			heightMap[mapTile] = hmPlate[plateTile];
 			heightMap[mapTile] = activePlate;
 			ageMap[mapTile] = agePlate[plateTile];
 		}
-		return collisionFlags;
+		return 1;
+	}
+	
+	private void processSubductions() {
+		// Process all subductions
+		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
+			for (CollisionDetails cd: subductions[activePlate]) {
+				plates[activePlate].addCrustBySubduction(
+					cd.getX(), cd.getY(), cd.getCrust(), generations,
+					plates[cd.getIndex()].getVelocityX(), plates[cd.getIndex()].getVelocityY());
+			}
+			subductions[activePlate].clear();
+		}
+	}
+	
+	private void processCollisions() {
+		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
+			for (CollisionDetails cd: collisions[activePlate]) {
+				plates[activePlate].applyFriction(cd.getCrust());
+				plates[cd.getIndex()].applyFriction(cd.getCrust());
+				
+				CollisionStatistic csPlateA = plates[activePlate].getCollisionInfo(cd.getX(), cd.getY());
+				CollisionStatistic csPlateB = plates[cd.getIndex()].getCollisionInfo(cd.getX(), cd.getY());
+				int collisionCount = Math.min(csPlateA.Collisions, csPlateB.Collisions);
+				float collisionRatio = Math.max(csPlateA.CollidedRatio, csPlateB.CollidedRatio);
+				
+				if ((collisionCount > aggr_ratio_abs) | (collisionRatio > aggr_ratio_rel)) {
+					plates[cd.getIndex()].collide(plates[activePlate], cd.getX(), cd.getY(), 
+						plates[activePlate].aggregateCrust(plates[cd.getIndex()], cd.getX(), cd.getY()));
+				}
+			}
+			collisions[activePlate].clear();
+		}
+	}
+	
+	private void regenerateCrust(float[] prevIndexMap, int[] ageMap) {
+		if (REGENERATE_CRUST) {
+			for (int y = 0; y < mapSize; y++) {
+				for (int x = 0; x < mapSize; x++) {
+					int mapTile = Util.getTile(x, y, mapSize);
+					if (indexMap[mapTile] >= numPlates) {
+						indexMap[mapTile] = prevIndexMap[mapTile];
+						ageMap[mapTile] = generations;
+						heightMap[mapTile] = OCEANIC_BASE * BUOYANCY_BONUS;
+						plates[(int) indexMap[mapTile]].setCrust(x, y, OCEANIC_BASE, generations);
+					}
+				}
+			}
+		}
+	}
+	
+	private void addSeaFloorUplift(int[] ageMap) {
+		if (BUOYANCY_BONUS > 0) {
+			for (int mapTile = 0; mapTile < mapArea; mapTile++) {
+				int crustAge = generations - ageMap[mapTile];
+				crustAge = Math.max(MAX_BUOYANCY_AGE, crustAge);
+				if (heightMap[mapTile] < CONTINENTAL_BASE)
+					heightMap[mapTile] += crustAge * BUOYANCY_BONUS * OCEANIC_BASE * (1.0f / MAX_BUOYANCY_AGE); 
+			}
+		}
 	}
 	
 	private PlateArea[] createPlates() {
@@ -286,7 +343,10 @@ public class Lithosphere {
 		Arrays.fill(indexMap, numPlates);	// initialize terrain-ownership map
 		
 		int maxBorder = 1;
+		int iterations = 0;
 		while (maxBorder > 0) {
+			if (false & iterations++ % mapSize == 0)
+				Util.saveHeightmap(indexMap, mapSize, "grow" + Integer.toString(iterations/mapSize));
 			maxBorder = 0;
 			for (int activePlate = 0; activePlate < numPlates; activePlate++) {
 				if (plates[activePlate].borderSize()== 0)

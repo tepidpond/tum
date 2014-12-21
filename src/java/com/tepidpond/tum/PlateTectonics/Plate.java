@@ -515,29 +515,36 @@ public class Plate {
 	 */
 	void setCrust(int worldX, int worldY, float amount, int timeStamp) {
 		if (amount < 0) amount = 0;	//negative mass is unlikely
+		worldX &= mapSize - 1; worldY &= mapSize - 1;	// Just to be safe
 		
 		int localX = getOffsetX(worldX), localY = getOffsetY(worldY);
 		int mapTile = getMapIndex(worldX, worldY);
 		
 		if (mapTile >= width * height) {
-			Vector4f bounds = new Vector4f(
-					left, top, left + width - 1, top + height - 1
-			);
+			// Bounds of this plate
+			Vector4f bounds = new Vector4f(left, top, left + width - 1, top + height - 1);
+			// Distance from each edge for the new crust piece.
 			Vector4f dist = new Vector4f(
-					left - worldX, top - worldY,
-					(worldX < left)?mapSize:0 + worldX - bounds.w,
-					(worldY <  top)?mapSize:0 + worldY - bounds.z
+				bounds.x - worldX,
+				bounds.y - worldY,
+				(worldX < bounds.x ? mapSize : 0) + worldX - bounds.z,
+				(worldY < bounds.y ? mapSize : 0) + worldY - bounds.w
 			);
+			
 			// Add new tile to nearest plate border
-			if (dist.x > mapSize || dist.z < dist.x) dist.x = 0;
-			if (dist.y > mapSize || dist.w < dist.y) dist.y = 0;
-			if (dist.z > mapSize || dist.x < dist.z) dist.z = 0;
-			if (dist.w > mapSize || dist.y < dist.w) dist.w = 0;
+			dist = new Vector4f(
+					dist.x * (dist.x <  dist.z ? 1 : 0) * (dist.x < mapSize ? 1 : 0),
+					dist.y * (dist.y <  dist.w ? 1 : 0) * (dist.y < mapSize ? 1 : 0),
+					dist.z * (dist.z <= dist.x ? 1 : 0) * (dist.z < mapSize ? 1 : 0),
+					dist.w * (dist.w <= dist.y ? 1 : 0) * (dist.w < mapSize ? 1 : 0)
+			);
 			// Force growth in 8 tile blocks (optimization maybe?)
-			if (dist.x > 0) dist.x = 8 * (int)(dist.x / 8 + 1);
-			if (dist.y > 0) dist.y = 8 * (int)(dist.y / 8 + 1);
-			if (dist.z > 0) dist.z = 8 * (int)(dist.z / 8 + 1);
-			if (dist.w > 0) dist.w = 8 * (int)(dist.w / 8 + 1);
+			if (false) {
+				if (dist.x > 0) dist.x = 8 * (int)(dist.x / 8 + 1);
+				if (dist.y > 0) dist.y = 8 * (int)(dist.y / 8 + 1);
+				if (dist.z > 0) dist.z = 8 * (int)(dist.z / 8 + 1);
+				if (dist.w > 0) dist.w = 8 * (int)(dist.w / 8 + 1);
+			}
 			
 			// Clamp new plate size to world map size
 			if (width + dist.x + dist.z > mapSize) {
@@ -550,25 +557,30 @@ public class Plate {
 			}
 			
 			// Update plate bounds based on distance
+			int oldWidth  = width, oldHeight = height;
 			left   -= dist.x; if (left < 0) left += mapSize;
+			width += dist.x + dist.z;
 			top    -= dist.y; if (top  < 0) top  += mapSize;
-			int newWidth  = width  + (int)(dist.x + dist.z);
-			int newHeight = height + (int)(dist.y + dist.w);
+			height += dist.y + dist.w;
 			
 			// Reallocate plate data storage
-			float[] newHeightmap = new float[newWidth * newHeight];
-			int[] newSegmentOwnerMap = new int[newWidth * newHeight];
-			int[] newTimestampMap = new int[newWidth * newHeight];
+			float[] newHeightmap = new float[width * height];
+			int[] newSegmentOwnerMap = new int[width * height];
+			int[] newTimestampMap = new int[width * height];
 			
 			// Copy existing data over
-			for (int row = 0; row < height; row++) {
-				System.arraycopy(heightMap, row, newHeightmap, row, width);
-				System.arraycopy(segmentOwnerMap, row, newSegmentOwnerMap, row, width);
-				System.arraycopy(timestampMap, row, newTimestampMap, row, width);
+			for (int row = 0; row < oldHeight; row++) {
+				int posDest = (int) ((dist.y + row) * width + dist.x);
+				int posSrc = row * oldWidth;
+				
+				if (oldWidth>width)
+					System.out.println("Panic!");
+				System.arraycopy(heightMap, posSrc, newHeightmap, posDest, oldWidth);
+				System.arraycopy(segmentOwnerMap, posSrc, newSegmentOwnerMap, posDest, oldWidth);
+				System.arraycopy(timestampMap, posSrc, newTimestampMap, posDest, oldWidth);
 			}
 			
 			// Replace the old(now invalid) storage
-			height = newHeight; width = newWidth;
 			heightMap = newHeightmap;
 			segmentOwnerMap = newSegmentOwnerMap;
 			timestampMap = newTimestampMap;

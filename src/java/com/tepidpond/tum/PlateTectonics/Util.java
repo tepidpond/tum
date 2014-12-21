@@ -33,7 +33,7 @@ public class Util {
 		for (int x=0; x<mapWidth; x++) {
 			for (int y=0; y<mapHeight; y++) {
 				float h = hm[getTile(x, y, mapWidth, mapHeight)];
-				g.setColor(new Color(h, h, h));
+				g.setColor(new Color(Color.HSBtoRGB(1.0f, 0.0f, h)));
 				g.drawLine(x, y, x, y);
 			}
 		}
