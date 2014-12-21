@@ -49,7 +49,7 @@ public class Lithosphere {
 		this.aggr_ratio_rel = aggr_ratio_rel;
 		this.foldingRatio = folding_ratio;
 		this.erosionPeriod = erosion_period;
-		this.mapArea = (int) Math.pow(mapSize + 1, 2);
+		this.mapArea = (int) Math.pow(mapSize, 2);
 		this.mapSize = mapSize;
 		if (_numPlates > mapArea)
 			numPlates = mapArea;
@@ -67,7 +67,7 @@ public class Lithosphere {
 			collisions[activePlate] = new Stack<CollisionDetails>();
 		}
 
-		float tmpHeightMap[] = new float[mapArea];
+		float tmpHeightMap[] = new float[(int) Math.pow(mapSize + 1, 2)];
 		
 		// Generate initial fractal map
 		if (!SquareDiamond.SqrDmd(tmpHeightMap, mapSize + 1, 1.0f, SQRDMD_ROUGHNESS, seed)) {
@@ -313,7 +313,7 @@ public class Lithosphere {
 	
 	private void addSeaFloorUplift(int[] ageMap) {
 		if (BUOYANCY_BONUS > 0) {
-			for (int mapTile = 0; mapTile < mapArea; mapTile++) {
+			for (int mapTile = 0; mapTile < heightMap.length; mapTile++) {
 				int crustAge = generations - ageMap[mapTile];
 				crustAge = Math.max(MAX_BUOYANCY_AGE, crustAge);
 				if (heightMap[mapTile] < CONTINENTAL_BASE)

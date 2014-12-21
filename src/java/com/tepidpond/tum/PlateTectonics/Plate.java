@@ -6,6 +6,8 @@ import java.util.Vector;
 
 import org.lwjgl.util.vector.Vector4f;
 
+import scala.collection.generic.BitOperations.Int;
+
 public class Plate {
 	private static final float DEFORMATION_WEIGHT = 5f;
 	private static final float INITIAL_SPEED = 1.0f;
@@ -515,53 +517,51 @@ public class Plate {
 	 */
 	void setCrust(int worldX, int worldY, float amount, int timeStamp) {
 		if (amount < 0) amount = 0;	//negative mass is unlikely
-		worldX &= mapSize - 1; worldY &= mapSize - 1;	// Just to be safe
 		
 		int localX = getOffsetX(worldX), localY = getOffsetY(worldY);
 		int plateTile = getMapIndex(worldX, worldY);
 		
 		if (plateTile >= width * height) {
 			// Bounds of this plate
-			Vector4f bounds = new Vector4f(left, top, left + width - 1, top + height - 1);
+			int bounds[] = new int[] {left, top, left + width - 1, top + height - 1};
 			// Distance from each edge for the new crust piece.
-			Vector4f dist = new Vector4f(
-				bounds.x - worldX,
-				bounds.y - worldY,
-				(worldX < bounds.x ? mapSize : 0) + worldX - bounds.z,
-				(worldY < bounds.y ? mapSize : 0) + worldY - bounds.w
-			);
+			int dist[] = new int[] {
+				bounds[0] - worldX,
+				bounds[1] - worldY,
+				(worldX < bounds[0] ? mapSize : 0) + worldX - bounds[2],
+				(worldY < bounds[1] ? mapSize : 0) + worldY - bounds[3]
+			};
+			// Negative distances are not valid.
+			for(int i = 0; i < 4; i++) if (dist[i] < 0) dist[i] = mapSize;
+			int dist2[] = new int[4];
+			if (dist[0] >= dist[2] || dist[0] >= mapSize) dist2[0] = 0; else dist2[0] = dist[0];
+			if (dist[1] >= dist[3] || dist[1] >= mapSize) dist2[1] = 0; else dist2[1] = dist[1];
+			if (dist[2] >  dist[0] || dist[2] >= mapSize) dist2[2] = 0; else dist2[2] = dist[2];
+			if (dist[3] >  dist[1] || dist[3] >= mapSize) dist2[3] = 0; else dist2[3] = dist[3];
+			
+			worldX &= mapSize - 1; worldY &= mapSize - 1;	// Just to be safe
 			
 			// Add new tile to nearest plate border
-			dist = new Vector4f(
-					dist.x * (dist.x >=0 && dist.x <  dist.z ? 1 : 0) * (dist.x < mapSize ? 1 : 0),
-					dist.y * (dist.y >=0 && dist.y <  dist.w ? 1 : 0) * (dist.y < mapSize ? 1 : 0),
-					dist.z * (dist.z >=0 && dist.z <= dist.x ? 1 : 0) * (dist.z < mapSize ? 1 : 0),
-					dist.w * (dist.w >=0 && dist.w <= dist.y ? 1 : 0) * (dist.w < mapSize ? 1 : 0)
-			);
-			// Force growth in 8 tile blocks (optimization maybe?)
-			if (false) {
-				if (dist.x > 0) dist.x = 8 * (int)(dist.x / 8 + 1);
-				if (dist.y > 0) dist.y = 8 * (int)(dist.y / 8 + 1);
-				if (dist.z > 0) dist.z = 8 * (int)(dist.z / 8 + 1);
-				if (dist.w > 0) dist.w = 8 * (int)(dist.w / 8 + 1);
-			}
+
 			
 			// Clamp new plate size to world map size
-			if (width + dist.x + dist.z > mapSize) {
-				dist.x = 0;
-				dist.z = mapSize - width;
+			if (width + dist2[0] + dist2[2] > mapSize) {
+				dist2[0] = 0;
+				dist2[2] = mapSize - width;
 			}
-			if (height + dist.y + dist.w > mapSize) {
-				dist.y = 0;
-				dist.w = mapSize - height;
+			if (height + dist2[1] + dist2[3] > mapSize) {
+				dist2[1] = 0;
+				dist2[3] = mapSize - height;
 			}
 			
 			// Update plate bounds based on distance
 			int oldWidth  = width, oldHeight = height;
-			left   -= dist.x; if (left < 0) left += mapSize;
-			width += dist.x + dist.z;
-			top    -= dist.y; if (top  < 0) top  += mapSize;
-			height += dist.y + dist.w;
+			left   -= dist2[0]; if (left < 0) left += mapSize;
+			width += dist2[0] + dist2[2];
+			top    -= dist2[1]; if (top  < 0) top  += mapSize;
+			height += dist2[1] + dist2[3];
+			
+			System.out.printf("%dx%d + [%d,%d] + [%d,%d] = %dx%d\n", oldWidth, oldHeight, dist2[0], dist2[1], dist2[2], dist2[3], width, height);
 			
 			// Reallocate plate data storage
 			float[] newHeightmap = new float[width * height];
@@ -570,7 +570,7 @@ public class Plate {
 			
 			// Copy existing data over
 			for (int row = 0; row < oldHeight; row++) {
-				int posDest = (int) ((dist.y + row) * width + dist.x);
+				int posDest = (int) ((dist2[1] + row) * width + dist2[0]);
 				int posSrc = row * oldWidth;
 				
 				if (oldWidth>width)
@@ -587,13 +587,16 @@ public class Plate {
 			
 			// Shift collision segment local coordinates
 			for (CollisionSegment seg:collisionSegments) {
-				seg.X0 += dist.x;
-				seg.X1 += dist.x;
-				seg.Y0 += dist.y;
-				seg.Y1 += dist.y;
+				seg.X0 += dist2[0];
+				seg.X1 += dist2[0];
+				seg.Y0 += dist2[1];
+				seg.Y1 += dist2[1];
+			}
+			plateTile = getMapIndex(worldX, worldY);
+			if (plateTile >= heightMap.length) {
+				System.out.println("Panic! Tile outside of map after resize!" + Integer.toString(heightMap.length) + "<=" + Integer.toString(plateTile));
 			}
 		}
-		plateTile = getMapIndex(worldX, worldY);
 		if (amount > 0 && heightMap[plateTile] > 0) {
 			timestampMap[plateTile] += timeStamp;
 			timestampMap[plateTile] /= 2;
