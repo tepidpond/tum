@@ -95,15 +95,15 @@ public class Plate {
 	
 	/**
 	 * Increment collision counter of the continent at given location.
-	 * @param x X coordinate of collision point on world map.
-	 * @param y Y coordinate of collision point on world map.
+	 * @param worldX X coordinate of collision point on world map.
+	 * @param worldY Y coordinate of collision point on world map.
 	 * @return Surface area of the collided continent (HACK!)
 	 */
-	int addCollision(int x, int y) {
-		int tile = getMapIndex(x, y);
-		int xLocal = getLocalX(x);
-		int yLocal = getLocalY(y);
-		int newSegment = this.segmentOwnerMap[tile];
+	int addCollision(int worldX, int worldY) {
+		int plateTile = getMapIndex(worldX, worldY);
+		int xLocal = getLocalX(worldX);
+		int yLocal = getLocalY(worldY);
+		int newSegment = this.segmentOwnerMap[plateTile];
 		if (newSegment >= collisionSegments.size())
 			newSegment = createSegment(xLocal, yLocal);
 		
@@ -518,98 +518,99 @@ public class Plate {
 	void setCrust(int worldX, int worldY, float amount, int timeStamp) {
 		if (amount < 0) amount = 0;	//negative mass is unlikely
 		
-		int plateTile = getMapIndex(worldX, worldY);
-		
-		if (!worldTileIsOnPlate(worldX, worldY)) {
-			// Bounds of this plate
-			int bounds[] = new int[] {left, top, left + width - 1, top + height - 1};
+		worldX %= mapSize; worldY %= mapSize;	// To be safe but quite unlikely
+		int localX = worldX - left + (worldX < left ? mapSize : 0);
+		int localY = worldY - top + (worldY < top ? mapSize : 0);
+		int plateTile = localY * width + localX;
 
-			worldX &= mapSize - 1; worldY &= mapSize - 1;	// Just to be safe
-
-			// Distance from each edge for the new crust piece.
-			int dist[] = new int[] {
-				(bounds[0] - worldX),
-				(bounds[1] - worldY),
-				-(bounds[2] - worldX) + (worldX < bounds[0] ? mapSize : 0),
-				-(bounds[3] - worldY) + (worldY < bounds[1] ? mapSize : 0)
+		if (localX < 0 || localX >= width || localY < 0 || localY >= height) {
+			int newWidth = width, newHeight = height;
+			int bound[] = new int[] {
+				left, top, (left + width - 1) % mapSize, (top + height - 1) % mapSize
 			};
-			// Negative distances are not valid.
-			for(int i = 0; i < 4; i++) if (dist[i] < 0) dist[i] = mapSize;
-			int dist2[] = new int[4];
-			if (dist[0] >= dist[2] || dist[0] >= mapSize) dist2[0] = 0; else dist2[0] = dist[0];
-			if (dist[1] >= dist[3] || dist[1] >= mapSize) dist2[1] = 0; else dist2[1] = dist[1];
-			if (dist[2] >  dist[0] || dist[2] >= mapSize) dist2[2] = 0; else dist2[2] = dist[2];
-			if (dist[3] >  dist[1] || dist[3] >= mapSize) dist2[3] = 0; else dist2[3] = dist[3];
-						
-			// Add new tile to nearest plate border
 
+			//System.out.printf("Old Bounds [%d,%d]-[%d,%d] (%dx%d)\n", bound[0], bound[1], bound[2], bound[3], width, height);  
 			
-			// Clamp new plate size to world map size
-			if (width + dist2[0] + dist2[2] >= mapSize) {
-				dist2[0] = 0;
-				dist2[2] = mapSize - width;
+			int distTmp[] = new int[] {
+				bound[0] - worldX + (worldX>bound[0] ? mapSize : 0),	// dist from left side
+				bound[1] - worldY + (worldY>bound[1] ? mapSize : 0),	// dist from top side
+				worldX - bound[2] + (worldX<bound[2] ? mapSize : 0),	// dist from right side
+				worldY - bound[3] + (worldY<bound[3] ? mapSize : 0) 	// dist from bottom side			
+			};
+			int dist[] = new int[] {0, 0, 0, 0};
+			
+			if (localX < 0 || localX >= width) {
+				// Update width/left
+				dist[0] = distTmp[0] <  distTmp[2] ? distTmp[0] : 0;				// use smallest distance 
+				dist[2] = distTmp[2] <= distTmp[0] ? distTmp[2] : 0;
+				bound[0] = bound[0] - dist[0] + (dist[0] > bound[0] ? mapSize : 0);;
+				bound[2] = (bound[2] + dist[2]) % mapSize;
+				newWidth = width + dist[0] + dist[2];
+				if (newWidth < width) newWidth = width;		// This should NOT be possible.
 			}
-			if (height + dist2[1] + dist2[3] >= mapSize) {
-				dist2[1] = 0;
-				dist2[3] = mapSize - height;
+			if (localY < 0 || localY >= height) {
+					dist[1] = distTmp[1] <  distTmp[3] ? distTmp[1] : 0;				// use smallest distance
+				dist[3] = distTmp[3] <= distTmp[1] ? distTmp[3] : 0;
+				bound[1] = bound[1] - dist[1] + (dist[1] > bound[1] ? mapSize : 0);
+				bound[3] = (bound[3] + dist[3]) % mapSize;
+				newHeight = height + dist[1] + dist[3];
+				if (newHeight < height) newHeight = height;	// This should NOT be possible.
 			}
 			
-			// Update plate bounds based on distance
-			int oldWidth  = width, oldHeight = height;
-			left   -= dist2[0]; if (left < 0) left += mapSize;
-			width += dist2[0] + dist2[2];
-			top    -= dist2[1]; if (top  < 0) top  += mapSize;
-			height += dist2[1] + dist2[3];
-			
-			if (dist2[0]>1 || dist2[1]>1 || dist2[2]>1 || dist2[3]>1)
-				System.out.printf("%dx%d + [%d,%d] + [%d,%d] = %dx%d\n", oldWidth, oldHeight, dist2[0], dist2[1], dist2[2], dist2[3], width, height);
-			
-			// Reallocate plate data storage
-			float[] newHeightmap = new float[width * height];
-			int[] newSegmentOwnerMap = new int[width * height];
-			int[] newTimestampMap = new int[width * height];
-			
-			// Copy existing data over
-			for (int row = 0; row < oldHeight; row++) {
-				int posDest = (int) ((dist2[1] + row) * width + dist2[0]);
-				int posSrc = row * oldWidth;
+			if (newWidth != width || newHeight != height) {
+				//System.out.printf("Updating to include point (%d,%d).\n", worldX, worldY);
+				//if (dist[0]<dist[2]) System.out.printf("Expanding right %d.\n", dist[2]); else System.out.printf("Expanding left %d.\n", dist[0]); 
+				//if (dist[1]<dist[3]) System.out.printf("Expanding down %d.\n", dist[3]); else System.out.printf("Expanding up %d.\n", dist[1]); 
+				//System.out.printf("New Bounds [%d,%d]-[%d,%d] (%dx%d)\n", bound[0], bound[1], bound[2], bound[3], newWidth, newHeight);  
 				
-				if (oldWidth>width)
-					System.out.println("Panic!");
-				System.arraycopy(heightMap, posSrc, newHeightmap, posDest, oldWidth);
-				System.arraycopy(segmentOwnerMap, posSrc, newSegmentOwnerMap, posDest, oldWidth);
-				System.arraycopy(timestampMap, posSrc, newTimestampMap, posDest, oldWidth);
-			}
-			
-			// Replace the old(now invalid) storage
-			heightMap = newHeightmap;
-			segmentOwnerMap = newSegmentOwnerMap;
-			timestampMap = newTimestampMap;
-			
-			// Shift collision segment local coordinates
-			for (CollisionSegment seg:collisionSegments) {
-				seg.X0 += dist2[0];
-				seg.X1 += dist2[0];
-				seg.Y0 += dist2[1];
-				seg.Y1 += dist2[1];
+				left = bound[0]; top = bound[1];
+				
+				// Reallocate plate data storage
+				float[] newHeightmap = new float[newWidth * newHeight];
+				int[] newSegmentOwnerMap = new int[newWidth * newHeight];
+				int[] newTimestampMap = new int[newWidth * newHeight];
+				
+				// Copy existing data over
+				if (newWidth < width || newHeight < height)
+					System.out.println("Panic! Somehow shrunk the plate when adding a new tile!");
+				for (int row = 0; row < height; row++) {
+					int posDest = (int) ((dist[1] + row) * newWidth + dist[0]);
+					int posSrc = row * width;
+					
+					System.arraycopy(heightMap, posSrc, newHeightmap, posDest, width);
+					System.arraycopy(segmentOwnerMap, posSrc, newSegmentOwnerMap, posDest, width);
+					System.arraycopy(timestampMap, posSrc, newTimestampMap, posDest, width);
+				}
+				
+				// Replace the old(now invalid) storage
+				heightMap = newHeightmap;
+				segmentOwnerMap = newSegmentOwnerMap;
+				timestampMap = newTimestampMap;
+				width = newWidth; height = newHeight;
+				
+				// Shift collision segment local coordinates
+				for (CollisionSegment seg:collisionSegments) {
+					seg.X0 += dist[0];
+					seg.X1 += dist[0];
+					seg.Y0 += dist[1];
+					seg.Y1 += dist[1];
+				}
 			}
 			plateTile = getMapIndex(worldX, worldY);
 			if (plateTile >= heightMap.length) {
 				System.out.println("Panic! Tile outside of map after resize!" + Integer.toString(heightMap.length) + "<=" + Integer.toString(plateTile));
 			}
 		}
-		if (plateTile < heightMap.length) {
-			if (amount > 0 && heightMap[plateTile] > 0) {
-				timestampMap[plateTile] += timeStamp;
-				timestampMap[plateTile] /= 2;
-			} else if (amount > 0) {
-				timestampMap[plateTile] = timeStamp;
-			}
-			// Update mass
-			M -= heightMap[plateTile];
-			heightMap[plateTile] = amount;
-			M += heightMap[plateTile];
+		if (amount > 0 && heightMap[plateTile] > 0) {
+			timestampMap[plateTile] += timeStamp;
+			timestampMap[plateTile] /= 2;
+		} else if (amount > 0) {
+			timestampMap[plateTile] = timeStamp;
 		}
+		// Update mass
+		M -= heightMap[plateTile];
+		heightMap[plateTile] = amount;
+		M += heightMap[plateTile];
 	}
 	
 	/**
@@ -733,18 +734,22 @@ public class Plate {
 	 * @param y Y coordinate on world map.
 	 * @return Index into local heightmap.
 	 */
-	private int getMapIndex(int x, int y) {
-		return (getLocalY(y) * width + getLocalX(x));
+	private int getMapIndex(int worldX, int worldY) {
+		worldX %= mapSize; worldY %= mapSize;
+		worldX += (worldX <left) ? mapSize : 0;
+		worldY += (worldY < top) ? mapSize : 0;
+		
+		return (worldY - top) * width + (worldX - left);
 	}
 	private int getLocalX(int worldX) {
-		worldX &= mapSize - 1;           // scale within map dimensions
-		if (worldX < this.left) worldX += mapSize; // wrap around world edge if necessary
+		worldX %= mapSize;           // scale within map dimensions
+		if (worldX < left) worldX += mapSize; // wrap around world edge if necessary
 		worldX -= this.left;
 		return worldX;
 	}
 	private int getLocalY(int worldY) {
-		worldY &= mapSize - 1;           // scale within map dimensions
-		if (worldY < this.top) worldY += mapSize;  // wrap around world edge if necessary
+		worldY %= mapSize;           // scale within map dimensions
+		if (worldY < top) worldY += mapSize;  // wrap around world edge if necessary
 		worldY -= this.top;
 		return worldY;
 	}

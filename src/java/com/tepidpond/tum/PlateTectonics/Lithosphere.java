@@ -103,12 +103,13 @@ public class Lithosphere {
 		Arrays.fill(indexMap, numPlates);
 		int ageMap[] = new int[mapArea];
 		
+		System.out.printf("In update generation %d, collecting collisions.\n",generations);
 		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
 			Plate p = plates[activePlate];
 			int X0 = p.getLeft();
-			int X1 = p.getLeft() + p.getWidth();
+			int X1 = p.getLeft() + p.getWidth() - 1;
 			int Y0 = p.getTop();
-			int Y1 = p.getTop() + p.getHeight();
+			int Y1 = p.getTop() + p.getHeight() - 1;
 			float[] hmPlate = p.getHeightmap();			
 			int[] agePlate = p.getTimestampMap();
 			
@@ -116,16 +117,18 @@ public class Lithosphere {
 				continentalCollisions += collectCollisions(ageMap, activePlate, x, y);
 			}
 		}
+		System.out.printf("In update generation %d, counted %d continental collisions.\n",generations,continentalCollisions);
 		
 		if (continentalCollisions == 0) lastCollisionCount++; else lastCollisionCount = 0;
 		processSubductions();
 		processCollisions();
 		regenerateCrust(prevIndexMap, ageMap);
 		addSeaFloorUplift(ageMap);
-		generations++;
 		
 		if (generations % 32 == 0)
 			Util.saveHeightmap(heightMap, mapSize, "upd" + Integer.toString(generations/32));
+
+		generations++;
 		return true;
 	}
 	
