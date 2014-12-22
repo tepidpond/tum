@@ -401,11 +401,14 @@ public class Lithosphere {
 			int x1 = plateAreas[activePlate].x1;
 			int y0 = plateAreas[activePlate].y0;
 			int y1 = plateAreas[activePlate].y1;
-			float[] plateHM = new float[(x1 - x0) * (y1 - y0)];
-			for (int y = plateAreas[activePlate].y0; y < plateAreas[activePlate].y1; y++) {
-				for (int x = plateAreas[activePlate].x0; x < plateAreas[activePlate].x1; x++) {
-					int mapTile = Util.getTile(x, y, mapSize);
-					int plateTile = Util.getTile(x - x0, y - y0, x1 - x0);
+			int plateWdt = x1 - x0 + 1;
+			int plateHgt = y1 - y0 + 1;
+			System.out.printf("plate %d: %dx%d to %dx%d, [%d, %d]\n", activePlate, x0, y0, x1, y1, plateWdt, plateHgt);
+			float[] plateHM = new float[plateWdt * plateHgt];
+			for (int localY = 0; localY < plateHgt; localY++) {
+				for (int localX = 0; localX < plateWdt; localX++) {
+					int mapTile = Util.getTile(localX + x0, localY + y0, mapSize);
+					int plateTile = Util.getTile(localX, localY, plateWdt, plateHgt);
 					if (indexMap[mapTile] == activePlate) {
 						plateHM[plateTile] = heightMap[mapTile];
 					} else {
@@ -414,8 +417,8 @@ public class Lithosphere {
 				}
 			}
 			
-			Util.saveHeightmap(plateHM, x1 - x0, y1 - y0, "plate" + Integer.toString(activePlate));
-			plates[activePlate] = new Plate(plateHM, x1 - x0, x0, y0, activePlate, mapSize, rand);
+			Util.saveHeightmap(plateHM, plateWdt, plateHgt, "plate" + Integer.toString(activePlate));
+			plates[activePlate] = new Plate(plateHM, plateWdt, x0, y0, activePlate, mapSize, rand);
 		}
 		return plates;
 	}
