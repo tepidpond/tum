@@ -545,11 +545,11 @@ public class Plate {
 
 			
 			// Clamp new plate size to world map size
-			if (width + dist2[0] + dist2[2] > mapSize) {
+			if (width + dist2[0] + dist2[2] >= mapSize) {
 				dist2[0] = 0;
 				dist2[2] = mapSize - width;
 			}
-			if (height + dist2[1] + dist2[3] > mapSize) {
+			if (height + dist2[1] + dist2[3] >= mapSize) {
 				dist2[1] = 0;
 				dist2[3] = mapSize - height;
 			}

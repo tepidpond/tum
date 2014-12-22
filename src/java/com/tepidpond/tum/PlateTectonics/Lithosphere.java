@@ -124,7 +124,8 @@ public class Lithosphere {
 		addSeaFloorUplift(ageMap);
 		generations++;
 		
-		Util.saveHeightmap(heightMap, mapSize, "upd" + Integer.toString(generations));
+		if (generations % 32 == 0)
+			Util.saveHeightmap(heightMap, mapSize, "upd" + Integer.toString(generations/32));
 		return true;
 	}
 	
