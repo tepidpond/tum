@@ -101,8 +101,8 @@ public class Plate {
 	 */
 	int addCollision(int x, int y) {
 		int tile = getMapIndex(x, y);
-		int xLocal = getOffsetX(x);
-		int yLocal = getOffsetY(y);
+		int xLocal = getLocalX(x);
+		int yLocal = getLocalY(y);
 		int newSegment = this.segmentOwnerMap[tile];
 		if (newSegment >= collisionSegments.size())
 			newSegment = createSegment(xLocal, yLocal);
@@ -122,8 +122,8 @@ public class Plate {
 	void addCrustByCollision(int x, int y, float amount, int creationTime) {
 		setCrust(x, y, getCrust(x, y) + amount, creationTime);
 		int tile = getMapIndex(x, y);
-		int xLocal = getOffsetX(x);
-		int yLocal = getOffsetY(y);
+		int xLocal = getLocalX(x);
+		int yLocal = getLocalY(y);
 	}
 	
 	/**
@@ -142,7 +142,7 @@ public class Plate {
 	 * @param dY Y direction of the subducting plate.
 	 */
 	void addCrustBySubduction(int x, int y, float amount, int creationTime, float dX, float dY) {
-		int localX = getOffsetX(x), localY = getOffsetY(y);
+		int localX = getLocalX(x), localY = getLocalY(y);
 		
 		float dotProduct = vX * dX + vY * dX;
 		if (dotProduct > 0) {
@@ -192,8 +192,8 @@ public class Plate {
 	 */
 	float aggregateCrust(Plate plate, int worldX, int worldY) {
 		int mapTile = getMapIndex(worldX, worldY);
-		int localX = getOffsetX(worldX);
-		int localY = getOffsetY(worldY);
+		int localX = getLocalX(worldX);
+		int localY = getLocalY(worldY);
 		
 		int segmentID = segmentOwnerMap[mapTile];
 		CollisionSegment segment = collisionSegments.elementAt(segmentID); 
@@ -256,8 +256,8 @@ public class Plate {
 	void collide(Plate plate, int worldX, int worldY, float collidingMass) {
 		float coefficientRestitution = 0.0f;
 		
-		int plateA_X = this.getOffsetX(worldX), plateA_Y = this.getOffsetY(worldY);
-		int plateB_X = plate.getOffsetX(worldX), plateB_Y = plate.getOffsetY(worldY);
+		int plateA_X = this.getLocalX(worldX), plateA_Y = this.getLocalY(worldY);
+		int plateB_X = plate.getLocalX(worldX), plateB_Y = plate.getLocalY(worldY);
 		int plateA_Tile = this.getMapIndex(worldX, worldY);
 		int plateB_Tile = plate.getMapIndex(worldX, worldY);
 
@@ -381,7 +381,7 @@ public class Plate {
 	 *         of area collided and number of collisions
 	 */
 	CollisionStatistic getCollisionInfo(int worldX, int worldY) {
-		int localX = getOffsetX(worldX), localY = getOffsetY(worldY);
+		int localX = getLocalX(worldX), localY = getLocalY(worldY);
 		int mapTile = getMapIndex(worldX, worldY);
 		int segmentID = segmentOwnerMap[mapTile];
 		CollisionSegment segment = collisionSegments.elementAt(segmentID);
@@ -561,7 +561,8 @@ public class Plate {
 			top    -= dist2[1]; if (top  < 0) top  += mapSize;
 			height += dist2[1] + dist2[3];
 			
-			System.out.printf("%dx%d + [%d,%d] + [%d,%d] = %dx%d\n", oldWidth, oldHeight, dist2[0], dist2[1], dist2[2], dist2[3], width, height);
+			if (dist2[0]>1 || dist2[1]>1 || dist2[2]>1 || dist2[3]>1)
+				System.out.printf("%dx%d + [%d,%d] + [%d,%d] = %dx%d\n", oldWidth, oldHeight, dist2[0], dist2[1], dist2[2], dist2[3], width, height);
 			
 			// Reallocate plate data storage
 			float[] newHeightmap = new float[width * height];
@@ -733,28 +734,28 @@ public class Plate {
 	 * @return Index into local heightmap.
 	 */
 	private int getMapIndex(int x, int y) {
-		return (getOffsetY(y) * width + getOffsetX(x));
+		return (getLocalY(y) * width + getLocalX(x));
 	}
-	private int getOffsetX(int x) {
-		x &= mapSize - 1;           // scale within map dimensions
-		if (x < this.left) x += mapSize; // wrap around world edge if necessary
-		x -= this.left;
-		return x;
+	private int getLocalX(int worldX) {
+		worldX &= mapSize - 1;           // scale within map dimensions
+		if (worldX < this.left) worldX += mapSize; // wrap around world edge if necessary
+		worldX -= this.left;
+		return worldX;
 	}
-	private int getOffsetY(int y) {
-		y &= mapSize - 1;           // scale within map dimensions
-		if (y < this.top) y += mapSize;  // wrap around world edge if necessary
-		y -= this.top;
-		return y;
+	private int getLocalY(int worldY) {
+		worldY &= mapSize - 1;           // scale within map dimensions
+		if (worldY < this.top) worldY += mapSize;  // wrap around world edge if necessary
+		worldY -= this.top;
+		return worldY;
 	}
 	private boolean worldTileIsOnPlate(int worldX, int worldY) {
-		if (worldX < 0 || worldY < 0) return false;
-		worldX &= mapSize - 1; worldY &= mapSize - 1;
+		int localX = getLocalX(worldX), localY = getLocalY(worldY);
 		
-		if ((worldX < this.left) ||
-			(worldY < this.top) ||
-			(worldX - this.left) >= this.width ||
-			(worldY - this.top) >= this.height) return false;
+		if (localX < 0 ||
+			localY > 0 ||
+			localX >= this.width ||
+			localY >= this.height) return false;
+
 		return true;
 	}
 }
