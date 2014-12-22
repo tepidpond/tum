@@ -518,18 +518,20 @@ public class Plate {
 	void setCrust(int worldX, int worldY, float amount, int timeStamp) {
 		if (amount < 0) amount = 0;	//negative mass is unlikely
 		
-		int localX = getOffsetX(worldX), localY = getOffsetY(worldY);
 		int plateTile = getMapIndex(worldX, worldY);
 		
-		if (plateTile >= width * height) {
+		if (!worldTileIsOnPlate(worldX, worldY)) {
 			// Bounds of this plate
 			int bounds[] = new int[] {left, top, left + width - 1, top + height - 1};
+
+			worldX &= mapSize - 1; worldY &= mapSize - 1;	// Just to be safe
+
 			// Distance from each edge for the new crust piece.
 			int dist[] = new int[] {
-				bounds[0] - worldX,
-				bounds[1] - worldY,
-				(worldX < bounds[0] ? mapSize : 0) + worldX - bounds[2],
-				(worldY < bounds[1] ? mapSize : 0) + worldY - bounds[3]
+				(bounds[0] - worldX),
+				(bounds[1] - worldY),
+				-(bounds[2] - worldX) + (worldX < bounds[0] ? mapSize : 0),
+				-(bounds[3] - worldY) + (worldY < bounds[1] ? mapSize : 0)
 			};
 			// Negative distances are not valid.
 			for(int i = 0; i < 4; i++) if (dist[i] < 0) dist[i] = mapSize;
@@ -538,9 +540,7 @@ public class Plate {
 			if (dist[1] >= dist[3] || dist[1] >= mapSize) dist2[1] = 0; else dist2[1] = dist[1];
 			if (dist[2] >  dist[0] || dist[2] >= mapSize) dist2[2] = 0; else dist2[2] = dist[2];
 			if (dist[3] >  dist[1] || dist[3] >= mapSize) dist2[3] = 0; else dist2[3] = dist[3];
-			
-			worldX &= mapSize - 1; worldY &= mapSize - 1;	// Just to be safe
-			
+						
 			// Add new tile to nearest plate border
 
 			
@@ -597,16 +597,18 @@ public class Plate {
 				System.out.println("Panic! Tile outside of map after resize!" + Integer.toString(heightMap.length) + "<=" + Integer.toString(plateTile));
 			}
 		}
-		if (amount > 0 && heightMap[plateTile] > 0) {
-			timestampMap[plateTile] += timeStamp;
-			timestampMap[plateTile] /= 2;
-		} else if (amount > 0) {
-			timestampMap[plateTile] = timeStamp;
+		if (plateTile < heightMap.length) {
+			if (amount > 0 && heightMap[plateTile] > 0) {
+				timestampMap[plateTile] += timeStamp;
+				timestampMap[plateTile] /= 2;
+			} else if (amount > 0) {
+				timestampMap[plateTile] = timeStamp;
+			}
+			// Update mass
+			M -= heightMap[plateTile];
+			heightMap[plateTile] = amount;
+			M += heightMap[plateTile];
 		}
-		// Update mass
-		M -= heightMap[plateTile];
-		heightMap[plateTile] = amount;
-		M += heightMap[plateTile];
 	}
 	
 	/**
@@ -735,14 +737,24 @@ public class Plate {
 	}
 	private int getOffsetX(int x) {
 		x &= mapSize - 1;           // scale within map dimensions
-		if (x < left) x += mapSize; // wrap around world edge if necessary
+		if (x < this.left) x += mapSize; // wrap around world edge if necessary
 		x -= this.left;
 		return x;
 	}
 	private int getOffsetY(int y) {
 		y &= mapSize - 1;           // scale within map dimensions
-		if (y < top) y += mapSize;  // wrap around world edge if necessary
+		if (y < this.top) y += mapSize;  // wrap around world edge if necessary
 		y -= this.top;
 		return y;
+	}
+	private boolean worldTileIsOnPlate(int worldX, int worldY) {
+		if (worldX < 0 || worldY < 0) return false;
+		worldX &= mapSize - 1; worldY &= mapSize - 1;
+		
+		if ((worldX < this.left) ||
+			(worldY < this.top) ||
+			(worldX - this.left) >= this.width ||
+			(worldY - this.top) >= this.height) return false;
+		return true;
 	}
 }
