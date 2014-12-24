@@ -91,9 +91,10 @@ public class Lithosphere {
 	}
 	
 	public boolean Update() {
-		Util.saveHeightmap(heightMap, mapSize, "g" + Integer.toString(generations));
-		
 		if (checkForStaticWorld()) return false;
+
+		Util.saveHeightmap(indexMap, mapSize, "p" + Integer.toString(generations));
+		Util.saveHeightmap(heightMap, mapSize, "t" + Integer.toString(generations));
 		
 		moveAndErodePlates();
 		int continentalCollisions = 0;
@@ -115,14 +116,12 @@ public class Lithosphere {
 			for (int y = Y0; y < Y1; y++) for (int x = X0; x < X1; x++) {
 				continentalCollisions += collectCollisions(ageMap, activePlate, x, y);
 			}
-			//Util.saveHeightmap(indexMap, mapSize, "g" + Integer.toString(generations) + "p" +Integer.toString(activePlate));
 		}
 		
 		if (continentalCollisions == 0) lastCollisionCount++; else lastCollisionCount = 0;
 		processSubductions();
 		processCollisions();
 		regenerateCrust(prevIndexMap, ageMap);
-		//Util.saveHeightmap(indexMap, mapSize, "g" + Integer.toString(generations) + "regen");
 
 		addSeaFloorUplift(ageMap);
 		
@@ -172,6 +171,7 @@ public class Lithosphere {
 			return 0;
 		
 		if (indexMap[worldTile] >= numPlates) {
+			assert(!Float.isNaN(plateHM[plateTile]));
 			heightMap[worldTile] = plateHM[plateTile];
 			indexMap[worldTile] = activePlate;
 			worldHMAge[worldTile] = plateHMAge[plateTile];
@@ -227,6 +227,7 @@ public class Lithosphere {
 			if (heightMap[worldTile] <= 0)
 			{
 				indexMap[worldTile] = activePlate;
+				assert(!Float.isNaN(plateHM[plateTile]));
 				heightMap[worldTile] = plateHM[plateTile];
 				worldHMAge[worldTile] = plateHMAge[plateTile];
 
@@ -244,6 +245,7 @@ public class Lithosphere {
 
 				// Give some...
 			heightMap[worldTile] += cd.getCrust();
+			assert(!Float.isNaN(heightMap[worldTile]));
 			plates[(int) indexMap[worldTile]].setCrust(worldX, worldY, heightMap[worldTile], plateHMAge[plateTile]);
 
 			// And take some.
@@ -258,6 +260,7 @@ public class Lithosphere {
 			collisions[(int) indexMap[worldTile]].Push(cd);
 
 			// Give the location to the larger plate.
+			assert(!Float.isNaN(plateHM[plateTile]));
 			heightMap[worldTile] = plateHM[plateTile];
 			heightMap[worldTile] = activePlate;
 			worldHMAge[worldTile] = plateHMAge[plateTile];
@@ -306,6 +309,7 @@ public class Lithosphere {
 						indexMap[mapTile] = prevIndexMap[mapTile];
 						ageMap[mapTile] = generations;
 						heightMap[mapTile] = OCEANIC_BASE * BUOYANCY_BONUS;
+						assert(!Float.isNaN(heightMap[mapTile]));
 						plates[(int) indexMap[mapTile]].setCrust(x, y, OCEANIC_BASE, generations);
 					}
 				}
@@ -320,6 +324,7 @@ public class Lithosphere {
 				crustAge = Math.max(MAX_BUOYANCY_AGE, crustAge);
 				if (heightMap[mapTile] < CONTINENTAL_BASE)
 					heightMap[mapTile] += crustAge * BUOYANCY_BONUS * OCEANIC_BASE * (1.0f / MAX_BUOYANCY_AGE); 
+				assert(!Float.isNaN(heightMap[mapTile]));
 			}
 		}
 	}
@@ -410,6 +415,7 @@ public class Lithosphere {
 					int mapTile = Util.getTile(localX + x0, localY + y0, mapSize);
 					int plateTile = Util.getTile(localX, localY, plateWdt, plateHgt);
 					if (indexMap[mapTile] == activePlate) {
+						assert(!Float.isNaN(heightMap[mapTile]));
 						plateHM[plateTile] = heightMap[mapTile];
 					} else {
 						plateHM[plateTile] = 0;

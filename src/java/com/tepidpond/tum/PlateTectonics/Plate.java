@@ -50,31 +50,13 @@ public class Plate {
 	public float getVelocityY() { return _vY;}
 	public float getVelocity() { return _velocity;}
 	private void setVelocity(float vX, float vY, float magnitude) {
-		if (Float.isNaN(vX+vY+magnitude)) {
-			System.out.printf("Extra panic! Inputs bad in setVelocity! vX = %f, vY = %f, vel = %f\n", vX, vY, magnitude);
-			return;
-		}
-		if (Float.isNaN(_vX) || Float.isNaN(_vY) || Float.isNaN(_velocity))
-			System.out.printf("Panic-in! vX = %f, vY = %f, vel = %f\n", _vX, _vY, _velocity);
-		vX *= vX > 0 ? 1 : 0;	// scale zero/negative velocity to zero.
-		vY *= vY > 0 ? 1 : 0;
-		magnitude *= magnitude > 0 ? 1 : 0;
-		if (magnitude <= Float.MIN_NORMAL || (vX <= Float.MIN_NORMAL && vY <= Float.MIN_NORMAL)) {
-			vX = vY = magnitude = 0;
-		} else {
-			double normFactor = Math.sqrt(Math.pow(vX, 2.0) + Math.pow(vY, 2.0));
-			if (Double.isNaN(normFactor) || Double.isInfinite(normFactor))
-				normFactor = 1.0;
-			_vX = (float) (vX / normFactor);
-			_vY = (float) (vY / normFactor);
-			_velocity = (float) (magnitude * normFactor);
-			if (Float.isNaN(_vX) || Float.isNaN(_vY) || Float.isNaN(_velocity))
-				System.out.printf("Panic! vX = %f, vY = %f, vel = %f\n", _vX, _vY, _velocity);
-		}
-		if (Float.isNaN(_vX) || Float.isNaN(_vY) || Float.isNaN(_velocity)) {
-			System.out.printf("Panic-out! vX = %f, vY = %f, vel = %f\n", _vX, _vY, _velocity);
-			_velocity = 0;
-		}
+		assert(!Float.isNaN(vX)); assert(!Float.isNaN(vY)); assert(!Float.isNaN(magnitude));
+
+		double normFactor = Math.sqrt(Math.pow(vX, 2.0) + Math.pow(vY, 2.0));
+
+		_vX = (float) (Math.abs(vX) / (normFactor > 0 ? normFactor : 1));
+		_vY = (float) (Math.abs(vY) / (normFactor > 0 ? normFactor : 1));
+		_velocity = (float) (magnitude * (normFactor > 0 ? normFactor : 1));
 	}
 	private void updateVelocity() {
 		float vX = getVelocityX(), vY = getVelocityY(), vel = getVelocity();
@@ -84,49 +66,35 @@ public class Plate {
 		vX += dX; vY += dY;
 		
 		float normFactor = (float)Math.sqrt(vX * vX + vY * vY);
-		if (normFactor > 0 && !Float.isNaN(normFactor) && !Float.isInfinite(normFactor)) {
-			if (vel < Float.MIN_NORMAL || Float.isInfinite(vel) || Float.isNaN(vel)) vel = 0.0f;
-			vX /= normFactor;
-			vY /= normFactor;
-			vel += normFactor - 1.0f;
-		} else {
-			vX = vY = vel = 0;
-		}
+		assert(!Float.isNaN(normFactor));
+		
+		vX /= normFactor;
+		vY /= normFactor;
+		vel += normFactor - 1.0f;
+		
 		setVelocity(vX, vY, vel);
 	}	
 	private float getImpulseX() { return _dY;}
 	private float getImpulseY() { return _dX;}
 	private float getImpulse() { return _acceleration;}
 	private void setImpulse(float dX, float dY, float magnitude) {
-		if (Float.isNaN(_dX) || Float.isNaN(_dY) || Float.isNaN(_acceleration))
-			System.out.printf("Panic! dX = %f, dY = %f, accel = %f\n", _dX, _dY, _acceleration);
-			
 		_dX = _dY = _acceleration = 0;
 		addImpulse(dX, dY, magnitude);
 	}
 	private void addImpulse(float dX, float dY, float magnitude) {
-		if (Float.isNaN(dX+dY+magnitude)) {
-			System.out.printf("Extra panic! Inputs bad in addImpulse! vX = %f, vY = %f, vel = %f\n", dX, dY, magnitude);
-			return;
-		}
+		assert(!Float.isNaN(dX)); assert(!Float.isNaN(dY)); assert(!Float.isNaN(magnitude));
 		
-		if (Float.isNaN(_dX) || Float.isNaN(_dY) || Float.isNaN(_acceleration))
-			System.out.printf("Panic-in! dX = %f, dY = %f, accel = %f", _dX, _dY, _acceleration);
 		dX *= dX > 0 ? 1 : 0;	// scale zero/negative velocity to zero.
 		dY *= dY > 0 ? 1 : 0;
 		magnitude *= magnitude > 0 ? 1 : 0;
-		if (magnitude <= Float.MIN_NORMAL || (dX <= Float.MIN_NORMAL && dY <= Float.MIN_NORMAL)) {
-			dX = dY = magnitude = 0;
-		} else {
-			double normFactor = Math.sqrt(Math.pow(dX, 2.0) + Math.pow(dY, 2.0));
-			if (Double.isNaN(normFactor) || Double.isInfinite(normFactor))
-				normFactor = 1.0;
+		
+		float normFactor = (float) Math.sqrt(Math.pow(dX, 2.0) + Math.pow(dY, 2.0));
+		assert(!Float.isNaN(normFactor));
+		if (normFactor > 0) {
 			_dX += (float) (dX / normFactor);
 			_dY += (float) (dY / normFactor);
-			_acceleration += (float) (magnitude * normFactor);
 		}
-		if (Float.isNaN(_dX) || Float.isNaN(_dY) || Float.isNaN(_acceleration))
-			System.out.printf("Panic-out! dX = %f, dY = %f, accel = %f", _dX, _dY, _acceleration);		
+		_acceleration += magnitude * normFactor;
 	}
 	
 	public Plate(float[] plateData, int plateMapWidth, int xOrigin, int yOrigin, int plateAge, int mapSize, Random rand) {
@@ -158,7 +126,9 @@ public class Plate {
 		for(int x = 0; x<width; x++) {
 			for (int y=0; y<height; y++) {
 				tileIndex = y * width + x;
+				assert(!Float.isNaN(heightMap[tileIndex]));
 				activeTile = heightMap[tileIndex];
+
 				R_x += x * activeTile;
 				R_y += y * activeTile;
 				M += activeTile;
@@ -222,9 +192,11 @@ public class Plate {
 	 * @param dY Y direction of the subducting plate.
 	 */
 	void addCrustBySubduction(int x, int y, float amount, int creationTime, float dX, float dY) {
+		assert(!Float.isNaN(amount));
+		
 		int localX = getLocalX(x), localY = getLocalY(y);
 		
-		float dotProduct = getVelocityX() * dX + getVelocity() * dX;
+		float dotProduct = getVelocityX() * dX + getVelocityY() * dY;
 		if (dotProduct > 0) {
 			dX -= getVelocityX();
 			dY -= getVelocityY();
@@ -386,6 +358,7 @@ public class Plate {
 			for (int x = 0; x < width; x++) {
 				int mapTile = y * width + x;
 				M += heightMap[mapTile];
+				assert(!Float.isNaN(heightMap[mapTile]));
 				newHeightmap[mapTile] += heightMap[mapTile];
 				
 				// Update R (center of mass)
@@ -417,29 +390,32 @@ public class Plate {
 								(heightW > 0 ? (diffW - minDiff) : 0.0f) + 
 								(heightE > 0 ? (diffE - minDiff) : 0.0f);
 				
-				if (diffSum < minDiff) {
-					newHeightmap[mapTileN] += (heightN > 0)?(diffN - minDiff):0;
-					newHeightmap[mapTileS] += (heightS > 0)?(diffS - minDiff):0;
-					newHeightmap[mapTileW] += (heightW > 0)?(diffW - minDiff):0;
-					newHeightmap[mapTileE] += (heightE > 0)?(diffE - minDiff):0;
-					newHeightmap[mapTile] -= diffSum;
-					minDiff -= diffSum;
-					minDiff /= 1 + (heightN > 0?1:0) + (heightS > 0?1:0) +
-					               (heightW > 0?1:0) + (heightE > 0?1:0);
-					
-					newHeightmap[mapTileN] += (heightN > 0)?(minDiff):0;
-					newHeightmap[mapTileS] += (heightS > 0)?(minDiff):0;
-					newHeightmap[mapTileW] += (heightW > 0)?(minDiff):0;
-					newHeightmap[mapTileE] += (heightE > 0)?(minDiff):0;
-				} else {
-					// Remove the erodable crust from the tile
-					newHeightmap[mapTile] -= minDiff;
-					float crustToShare = minDiff / diffSum;
-					// And spread it over the four neighbors.
-					newHeightmap[mapTileN] += crustToShare * (heightN > 0?diffN - minDiff:0);
-					newHeightmap[mapTileS] += crustToShare * (heightS > 0?diffS - minDiff:0);
-					newHeightmap[mapTileW] += crustToShare * (heightW > 0?diffW - minDiff:0);
-					newHeightmap[mapTileE] += crustToShare * (heightE > 0?diffE - minDiff:0);
+				if (diffSum > 0) {
+					if (diffSum < minDiff) {
+						newHeightmap[mapTileN] += (heightN > 0)?(diffN - minDiff):0;
+						newHeightmap[mapTileS] += (heightS > 0)?(diffS - minDiff):0;
+						newHeightmap[mapTileW] += (heightW > 0)?(diffW - minDiff):0;
+						newHeightmap[mapTileE] += (heightE > 0)?(diffE - minDiff):0;
+						newHeightmap[mapTile] -= diffSum;
+						minDiff -= diffSum;
+						minDiff /= 1 + (heightN > 0?1:0) + (heightS > 0?1:0) +
+						               (heightW > 0?1:0) + (heightE > 0?1:0);
+						assert(!Float.isNaN(minDiff));
+						
+						newHeightmap[mapTileN] += (heightN > 0)?(minDiff):0;
+						newHeightmap[mapTileS] += (heightS > 0)?(minDiff):0;
+						newHeightmap[mapTileW] += (heightW > 0)?(minDiff):0;
+						newHeightmap[mapTileE] += (heightE > 0)?(minDiff):0;
+					} else {
+						// Remove the erodable crust from the tile
+						newHeightmap[mapTile] -= minDiff;
+						float crustToShare = minDiff / diffSum;
+						// And spread it over the four neighbors.
+						newHeightmap[mapTileN] += crustToShare * (heightN > 0?diffN - minDiff:0);
+						newHeightmap[mapTileS] += crustToShare * (heightS > 0?diffS - minDiff:0);
+						newHeightmap[mapTileW] += crustToShare * (heightW > 0?diffW - minDiff:0);
+						newHeightmap[mapTileE] += crustToShare * (heightE > 0?diffE - minDiff:0);
+					}
 				}
 			}
 		}
@@ -588,6 +564,8 @@ public class Plate {
 	 * @param timeStamp Time of creation of new crust.
 	 */
 	void setCrust(int worldX, int worldY, float amount, int timeStamp) {
+		assert(!Float.isNaN(amount));
+		
 		if (amount < 0) amount = 0;	//negative mass is unlikely
 		
 		worldX %= mapSize; worldY %= mapSize;	// To be safe but quite unlikely
@@ -659,9 +637,7 @@ public class Plate {
 				}
 			}
 			plateTile = getLocalTile(worldX, worldY);
-			if (plateTile >= heightMap.length) {
-				System.out.println("Panic! Tile outside of map after resize!" + Integer.toString(heightMap.length) + "<=" + Integer.toString(plateTile));
-			}
+			assert(plateTile < heightMap.length);
 		}
 		if (amount > 0 && heightMap[plateTile] > 0) {
 			timestampMap[plateTile] += timeStamp;
@@ -672,7 +648,7 @@ public class Plate {
 		// Update mass
 		M -= heightMap[plateTile];
 		heightMap[plateTile] = amount;
-		M += heightMap[plateTile];
+		M += amount;
 	}
 	
 	/**
