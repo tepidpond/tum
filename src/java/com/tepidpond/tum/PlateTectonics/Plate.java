@@ -32,23 +32,103 @@ public class Plate {
 	// Center of mass of the plate in world coordinates
 	private float R_x, R_y;
 	// Components of plate's velocity. vX and vY are components of a unit vector, velocity is the magnitude
-	private float velocity, vX, vY;
+	private float _velocity, _vX, _vY;
 	// Components of plate's acceleration
-	private float dX, dY;
+	private float _acceleration, _dX, _dY;
 	
 	// Used for random off-setting in subduction routine and setting up initial direction
 	private Random rand;
 	
-	float getMomentum()  {return M * velocity;}
+	float getMomentum()  {return M * getVelocity();}
 	int  getLeft()       {return left;}
 	int getTop()         {return top;}
 	int getHeight()      {return height;}
 	int getWidth()       {return width;}
-	float getVelocity()  {return velocity;}
-	float getVelocityX() {return vX;}
-	float getVelocityY() {return vY;}
 	Boolean isEmpty()    {return M<=0;} 
 
+	public float getVelocityX() { return _vX;}
+	public float getVelocityY() { return _vY;}
+	public float getVelocity() { return _velocity;}
+	private void setVelocity(float vX, float vY, float magnitude) {
+		if (Float.isNaN(vX+vY+magnitude)) {
+			System.out.printf("Extra panic! Inputs bad in setVelocity! vX = %f, vY = %f, vel = %f\n", vX, vY, magnitude);
+			return;
+		}
+		if (Float.isNaN(_vX) || Float.isNaN(_vY) || Float.isNaN(_velocity))
+			System.out.printf("Panic-in! vX = %f, vY = %f, vel = %f\n", _vX, _vY, _velocity);
+		vX *= vX > 0 ? 1 : 0;	// scale zero/negative velocity to zero.
+		vY *= vY > 0 ? 1 : 0;
+		magnitude *= magnitude > 0 ? 1 : 0;
+		if (magnitude <= Float.MIN_NORMAL || (vX <= Float.MIN_NORMAL && vY <= Float.MIN_NORMAL)) {
+			vX = vY = magnitude = 0;
+		} else {
+			double normFactor = Math.sqrt(Math.pow(vX, 2.0) + Math.pow(vY, 2.0));
+			if (Double.isNaN(normFactor) || Double.isInfinite(normFactor))
+				normFactor = 1.0;
+			_vX = (float) (vX / normFactor);
+			_vY = (float) (vY / normFactor);
+			_velocity = (float) (magnitude * normFactor);
+			if (Float.isNaN(_vX) || Float.isNaN(_vY) || Float.isNaN(_velocity))
+				System.out.printf("Panic! vX = %f, vY = %f, vel = %f\n", _vX, _vY, _velocity);
+		}
+		if (Float.isNaN(_vX) || Float.isNaN(_vY) || Float.isNaN(_velocity)) {
+			System.out.printf("Panic-out! vX = %f, vY = %f, vel = %f\n", _vX, _vY, _velocity);
+			_velocity = 0;
+		}
+	}
+	private void updateVelocity() {
+		float vX = getVelocityX(), vY = getVelocityY(), vel = getVelocity();
+		float dX = getImpulseX(), dY = getImpulseY(), acc = getImpulse();
+		setImpulse(0f, 0f, 0f);
+		
+		vX += dX; vY += dY;
+		
+		float normFactor = (float)Math.sqrt(vX * vX + vY * vY);
+		if (normFactor > 0 && !Float.isNaN(normFactor) && !Float.isInfinite(normFactor)) {
+			if (vel < Float.MIN_NORMAL || Float.isInfinite(vel) || Float.isNaN(vel)) vel = 0.0f;
+			vX /= normFactor;
+			vY /= normFactor;
+			vel += normFactor - 1.0f;
+		} else {
+			vX = vY = vel = 0;
+		}
+		setVelocity(vX, vY, vel);
+	}	
+	private float getImpulseX() { return _dY;}
+	private float getImpulseY() { return _dX;}
+	private float getImpulse() { return _acceleration;}
+	private void setImpulse(float dX, float dY, float magnitude) {
+		if (Float.isNaN(_dX) || Float.isNaN(_dY) || Float.isNaN(_acceleration))
+			System.out.printf("Panic! dX = %f, dY = %f, accel = %f\n", _dX, _dY, _acceleration);
+			
+		_dX = _dY = _acceleration = 0;
+		addImpulse(dX, dY, magnitude);
+	}
+	private void addImpulse(float dX, float dY, float magnitude) {
+		if (Float.isNaN(dX+dY+magnitude)) {
+			System.out.printf("Extra panic! Inputs bad in addImpulse! vX = %f, vY = %f, vel = %f\n", dX, dY, magnitude);
+			return;
+		}
+		
+		if (Float.isNaN(_dX) || Float.isNaN(_dY) || Float.isNaN(_acceleration))
+			System.out.printf("Panic-in! dX = %f, dY = %f, accel = %f", _dX, _dY, _acceleration);
+		dX *= dX > 0 ? 1 : 0;	// scale zero/negative velocity to zero.
+		dY *= dY > 0 ? 1 : 0;
+		magnitude *= magnitude > 0 ? 1 : 0;
+		if (magnitude <= Float.MIN_NORMAL || (dX <= Float.MIN_NORMAL && dY <= Float.MIN_NORMAL)) {
+			dX = dY = magnitude = 0;
+		} else {
+			double normFactor = Math.sqrt(Math.pow(dX, 2.0) + Math.pow(dY, 2.0));
+			if (Double.isNaN(normFactor) || Double.isInfinite(normFactor))
+				normFactor = 1.0;
+			_dX += (float) (dX / normFactor);
+			_dY += (float) (dY / normFactor);
+			_acceleration += (float) (magnitude * normFactor);
+		}
+		if (Float.isNaN(_dX) || Float.isNaN(_dY) || Float.isNaN(_acceleration))
+			System.out.printf("Panic-out! dX = %f, dY = %f, accel = %f", _dX, _dY, _acceleration);		
+	}
+	
 	public Plate(float[] plateData, int plateMapWidth, int xOrigin, int yOrigin, int plateAge, int mapSize, Random rand) {
 		if (plateData.length < 1) return;
 		
@@ -66,9 +146,9 @@ public class Plate {
 		
 		// Establish initial velocity and direction.
 		double angle = 2 * Math.PI * rand.nextDouble();
-		this.velocity = 1;
-		this.vX = (float)Math.cos(angle) * INITIAL_SPEED;
-		this.vY = (float)Math.sin(angle) * INITIAL_SPEED;
+		setVelocity ((float)Math.cos(angle),
+		             (float)Math.sin(angle),
+		             INITIAL_SPEED);
 		// Intended for random circular motion of plate. Unused.
 		//this.alpha = -rand.nextInt(1) * Math.PI * 0.01 * rand.nextFloat();
 		
@@ -144,10 +224,10 @@ public class Plate {
 	void addCrustBySubduction(int x, int y, float amount, int creationTime, float dX, float dY) {
 		int localX = getLocalX(x), localY = getLocalY(y);
 		
-		float dotProduct = vX * dX + vY * dX;
+		float dotProduct = getVelocityX() * dX + getVelocity() * dX;
 		if (dotProduct > 0) {
-			dX -= vX;
-			dY -= vY;
+			dX -= getVelocityX();
+			dY -= getVelocityY();
 		}
 		
 		float offset = 3.0f * (float)Math.pow(rand.nextFloat(), 3.0D) * (2 * rand.nextInt(1) - 1);
@@ -235,8 +315,8 @@ public class Plate {
 		if (deformingMass > 0) {
 			float dV = DEFORMATION_WEIGHT * deformingMass / M;
 
-			if (dV > velocity) dV = velocity;
-			velocity -= dV;
+			if (dV > getVelocity()) dV = getVelocity();
+			setVelocity(getVelocityX(), getVelocityY(), getVelocity() - dV);
 		}
 	}
 	
@@ -269,11 +349,12 @@ public class Plate {
 		float collision_Y = plateA_dY - plateB_dY;
 		
 		float magnitude = (float)Math.sqrt(collision_X * collision_X + collision_Y * collision_Y);
-		if (magnitude <= 0)
+
+		if (magnitude <= 0 || Float.isNaN(magnitude))
 			return;	// no relative motion between plates.
 		
 		collision_X /= magnitude; collision_Y /= magnitude;	// normalize collision vector
-		float relative_X = vX - plate.vX, relative_Y = vY - plate.vY;	// find relative velocity vector
+		float relative_X = getVelocityX() - plate.getVelocityX(), relative_Y = getVelocityY() - plate.getVelocityY();	// find relative velocity vector
 		float dotProduct = relative_X * collision_X + relative_Y * collision_Y;
 		
 		if (dotProduct <= 0)
@@ -285,10 +366,8 @@ public class Plate {
 		float J = -(1 + coefficientRestitution) * dotProduct / denominatorOfImpulse;
 		
 		// Finally apply an acceleration;
-		dX += collision_X * J / M;
-		dY += collision_Y * J / M;
-		plate.dX -= collision_X * J / (collidingMass + plate.M);
-		plate.dY -= collision_Y * J / (collidingMass + plate.M);
+		this.addImpulse(collision_X, collision_Y, J / M);
+		plate.addImpulse(-collision_X, -collision_Y, J / (collidingMass + plate.M));
 	}
 	
 	/**
@@ -452,39 +531,21 @@ public class Plate {
 		updateVelocity();
 		updatePosition();
 	}
-	private void updateVelocity() {
-		if (Float.isNaN(dX)) dX = 0; if (Float.isNaN(dY)) dY = 0;
-		if (Float.isNaN(vX)) vX = 0; if (Float.isNaN(vY)) vY = 0;
-		if (Float.isNaN(velocity)) velocity = 0;
-		
-		vX += dX; dX = 0;
-		vY += dY; dY = 0;
-		
-		float len = (float)Math.sqrt(vX * vX + vY * vY);
-		if (!Float.isNaN(len)) {
-			vX /= len;
-			vY /= len;
-			velocity += len - 1.0;
-		}
-		if (velocity<0) velocity = 0;
-	}
 	private void updatePosition() {
 		if (left < 0 || left > mapSize || top < 0 || top > mapSize)
-			System.out.printf("OOB-Pre!! %f, %f, %f, %d, %d", vX, vY, velocity, left, top);
+			System.out.printf("OOB-Pre!! %f, %f, %f, %d, %d", getVelocityX(), getVelocityY(), getVelocity(), left, top);
 		
 		int oldLeft = left, oldTop = top;
-		left += vX * velocity;
+		left += getVelocityX() * getVelocity();
 		left += left > 0 ? 0 : mapSize;
 		left -= left < mapSize ? 0 : mapSize;
 		
-		top += vY * velocity;
+		top += getVelocity() * getVelocity();
 		top += top > 0 ? 0 : mapSize;
 		top -= top < mapSize ? 0 : mapSize;
 		
 		if (left < 0 || left > mapSize || top < 0 || top > mapSize)
-			System.out.printf("OOB-Post! %f, %f, %f, %d, %d", vX, vY, velocity, left, top);
-		
-		//System.out.printf("Moving plate! (%d,%d)->(%d,%d), dX:%f, dY:%f, vel:%f.\n",oldLeft,oldTop,left,top, vX, vY, velocity);
+			System.out.printf("OOB-Post! %f, %f, %f, %d, %d", getVelocityX(), getVelocityY(), getVelocity(), left, top);
 	}
 	
 	/**
