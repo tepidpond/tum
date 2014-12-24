@@ -94,7 +94,7 @@ public class Lithosphere {
 		if (checkForStaticWorld()) return false;
 
 		Util.saveHeightmap(indexMap, mapSize, "p" + Integer.toString(generations));
-		Util.saveHeightmap(heightMap, mapSize, "t" + Integer.toString(generations));
+		//Util.saveHeightmap(heightMap, mapSize, "t" + Integer.toString(generations));
 		
 		moveAndErodePlates();
 		int continentalCollisions = 0;

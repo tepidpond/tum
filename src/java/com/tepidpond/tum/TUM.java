@@ -21,7 +21,7 @@ public class TUM
     @EventHandler
     public void preInit(FMLInitializationEvent event)
     {
-    	Lithosphere lithos = new Lithosphere(512, 0.82f, 3, 0.5f, 5, 0.5f, 5, 9, 0);
+    	Lithosphere lithos = new Lithosphere(512, 0.65f, 60, 0.001f, 5000, 0.1f, 2, 10, 0);
     	for (int i=0; i<256; i++) {
     		lithos.Update();
     	}

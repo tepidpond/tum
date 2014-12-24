@@ -52,25 +52,31 @@ public class Plate {
 	private void setVelocity(float vX, float vY, float magnitude) {
 		assert(!Float.isNaN(vX)); assert(!Float.isNaN(vY)); assert(!Float.isNaN(magnitude));
 
-		double normFactor = Math.sqrt(Math.pow(vX, 2.0) + Math.pow(vY, 2.0));
-
-		_vX = (float) (Math.abs(vX) / (normFactor > 0 ? normFactor : 1));
-		_vY = (float) (Math.abs(vY) / (normFactor > 0 ? normFactor : 1));
-		_velocity = (float) (magnitude * (normFactor > 0 ? normFactor : 1));
+		float normFactor = (float) Math.sqrt(Math.pow(vX, 2.0) + Math.pow(vY, 2.0));
+		if (normFactor > 0) {
+			_vX = (float) (vX / normFactor);
+			_vY = (float) (vY / normFactor);
+			_velocity = magnitude * normFactor;
+		} else {
+			_vX = _vY = _velocity = 0;
+		}
 	}
 	private void updateVelocity() {
 		float vX = getVelocityX(), vY = getVelocityY(), vel = getVelocity();
 		float dX = getImpulseX(), dY = getImpulseY(), acc = getImpulse();
-		setImpulse(0f, 0f, 0f);
 		
 		vX += dX; vY += dY;
+		setImpulse(0f, 0f, 0f);
 		
 		float normFactor = (float)Math.sqrt(vX * vX + vY * vY);
 		assert(!Float.isNaN(normFactor));
-		
-		vX /= normFactor;
-		vY /= normFactor;
-		vel += normFactor - 1.0f;
+		if (normFactor > 0 && vel > 0) {
+			vX /= normFactor;
+			vY /= normFactor;
+			vel += normFactor - 1.0f;
+		} else {
+			vX = vY = vel = 0;
+		}
 		
 		setVelocity(vX, vY, vel);
 	}	
@@ -321,25 +327,23 @@ public class Plate {
 		float collision_Y = plateA_dY - plateB_dY;
 		
 		float magnitude = (float)Math.sqrt(collision_X * collision_X + collision_Y * collision_Y);
-
-		if (magnitude <= 0 || Float.isNaN(magnitude))
-			return;	// no relative motion between plates.
-		
+		assert(magnitude > 0);
 		collision_X /= magnitude; collision_Y /= magnitude;	// normalize collision vector
+		
 		float relative_X = getVelocityX() - plate.getVelocityX(), relative_Y = getVelocityY() - plate.getVelocityY();	// find relative velocity vector
 		float dotProduct = relative_X * collision_X + relative_Y * collision_Y;
 		
 		if (dotProduct <= 0)
 			return;	// plates moving away from each other.
 		
-		float denominatorOfImpulse = (float)Math.pow(magnitude, 2.0f) * (1.0f/M + 1.0f/collidingMass);
+		float denominatorOfImpulse = (float)(Math.pow(magnitude, 2.0) * (1.0/M + 1.0/collidingMass));
 		
 		// force of impulse
 		float J = -(1 + coefficientRestitution) * dotProduct / denominatorOfImpulse;
 		
 		// Finally apply an acceleration;
-		this.addImpulse(collision_X, collision_Y, J / M);
-		plate.addImpulse(-collision_X, -collision_Y, J / (collidingMass + plate.M));
+		this.addImpulse(collision_X * J / M, collision_Y * J / M, 1.0f);
+		plate.addImpulse(-collision_X * J / (collidingMass + plate.M), -collision_Y * J / (collidingMass + plate.M), 1.0f);
 	}
 	
 	/**
@@ -508,20 +512,20 @@ public class Plate {
 		updatePosition();
 	}
 	private void updatePosition() {
-		if (left < 0 || left > mapSize || top < 0 || top > mapSize)
-			System.out.printf("OOB-Pre!! %f, %f, %f, %d, %d", getVelocityX(), getVelocityY(), getVelocity(), left, top);
+		// Plate out of bounds here.
+		assert(left >= 0 && left <= mapSize && top >= 0 && top <= mapSize);
 		
 		int oldLeft = left, oldTop = top;
 		left += getVelocityX() * getVelocity();
-		left += left > 0 ? 0 : mapSize;
-		left -= left < mapSize ? 0 : mapSize;
+		if (left <= 0) left += mapSize;
+		if (left >= mapSize) left -= mapSize;
 		
-		top += getVelocity() * getVelocity();
-		top += top > 0 ? 0 : mapSize;
-		top -= top < mapSize ? 0 : mapSize;
+		top += getVelocityY() * getVelocity();
+		if (top <= 0) top += mapSize;
+		if (top >= mapSize) top -= mapSize;
 		
-		if (left < 0 || left > mapSize || top < 0 || top > mapSize)
-			System.out.printf("OOB-Post! %f, %f, %f, %d, %d", getVelocityX(), getVelocityY(), getVelocity(), left, top);
+		// Plate out of bounds here.
+		assert(left >= 0 && left <= mapSize && top >= 0 && top <= mapSize);
 	}
 	
 	/**
