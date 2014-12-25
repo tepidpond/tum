@@ -569,10 +569,10 @@ public class Plate {
 	 */
 	void setCrust(int worldX, int worldY, float amount, int timeStamp) {
 		assert(!Float.isNaN(amount));
+		assert(worldX >= 0 && worldX < mapSize && worldY >= 0 && worldY < mapSize);
 		
 		if (amount < 0) amount = 0;	//negative mass is unlikely
 		
-		worldX %= mapSize; worldY %= mapSize;	// To be safe but quite unlikely
 		int localX = getLocalX(worldX), localY = getLocalY(worldY);
 		int plateTile = localY * width + localX;
 
@@ -693,10 +693,10 @@ public class Plate {
 			
 			// in the 4 cardinal directions, clamp at border.
 			int tileN, tileS, tileW, tileE;
-			tileN = Util.getTile(x, Math.max(y - 1, 0), width);
-			tileS = Util.getTile(x, Math.min(y + 1, height - 1), width);
-			tileW = Util.getTile(Math.max(x - 1, 0), y, width);
-			tileE = Util.getTile(Math.min(x + 1, width - 1), y, width);
+			tileN = Util.getTile(x, Math.max(y - 1, 0), width, height);
+			tileS = Util.getTile(x, Math.min(y + 1, height - 1), width, height);
+			tileW = Util.getTile(Math.max(x - 1, 0), y, width, height);
+			tileE = Util.getTile(Math.min(x + 1, width - 1), y, width, height);
 			
 			// If the N/S/E/W tile is un-owned, claim it for the active segment
 			// and add it to the border.
