@@ -106,41 +106,57 @@ public class Plate {
 	public Plate(float[] plateData, int plateMapWidth, int xOrigin, int yOrigin, int plateAge, int mapSize, Random rand) {
 		if (plateData.length < 1) return;
 		
-		// Save basic pre-defined data.
-		this.heightMap = new float[plateData.length];
-		this.timestampMap = new int[plateData.length];
-		this.segmentOwnerMap = new int[plateData.length];
-		Arrays.fill(segmentOwnerMap, 255);
-		this.left = xOrigin;
-		this.top = yOrigin;
 		this.width = plateMapWidth;
 		this.height = plateData.length / plateMapWidth;
-		this.rand = rand;
 		this.mapSize = mapSize;
+		this.M = 0;
+		this.left = xOrigin;
+		this.top = xOrigin;
+		this.rand = rand;
+		R_x = 0;
+		R_y = 0;
+		setImpulse(0, 0, 0);
+		
+		int area = width * height;
+		double angle = 2 * Math.PI * rand.nextDouble();
+		
+		if (plateData == null)
+			return;
+		
+		// Save basic pre-defined data.
+		this.heightMap = new float[area];
+		this.timestampMap = new int[area];
+		this.segmentOwnerMap = new int[area];
 		
 		// Establish initial velocity and direction.
-		double angle = 2 * Math.PI * rand.nextDouble();
-		setVelocity ((float)Math.cos(angle),
-		             (float)Math.sin(angle),
-		             INITIAL_SPEED);
+		setVelocity ((float)Math.cos(angle) * INITIAL_SPEED,
+		             (float)Math.sin(angle) * INITIAL_SPEED,
+		             1.0f);
 		// Intended for random circular motion of plate. Unused.
 		//this.alpha = -rand.nextInt(1) * Math.PI * 0.01 * rand.nextFloat();
+		Arrays.fill(segmentOwnerMap, 255);
+		
 		
 		// Clone heightMap data, calculate center of mass and total mass.
 		int tileIndex = 0; float activeTile = 0.0f; 
-		System.arraycopy(plateData, 0, heightMap, 0, plateData.length);
-		for(int x = 0; x<width; x++) {
-			for (int y=0; y<height; y++) {
-				tileIndex = y * width + x;
-				assert(!Float.isNaN(heightMap[tileIndex]));
-				activeTile = heightMap[tileIndex];
-
-				R_x += x * activeTile;
-				R_y += y * activeTile;
-				M += activeTile;
+		for (int localY = 0; localY < height; localY++) {
+			for(int localX = 0; localX < width; localX++) {
+				tileIndex = localY * width + localX;
+				// Clone map data and count crust mass.
+				M += heightMap[tileIndex] = plateData[tileIndex];
 				
-				if (activeTile > 0.0f)
-					this.timestampMap[tileIndex] = plateAge;
+				// Calculate center coordinates weighted by mass.
+				R_x += localX * heightMap[tileIndex];
+				R_y += localY * heightMap[tileIndex];
+
+				// Set the age of ALL points in this plate to same
+				// value. The right thing to do would be to simulate
+				// the generation of new oceanic crust as it he plate
+				// had been moving to its current direction until all
+				// plate's (oceanic) crust receives an age.
+				this.timestampMap[tileIndex] = heightMap[tileIndex] > 0 ? plateAge : 0;
+				
+				assert(!Float.isNaN(heightMap[tileIndex]));
 			}
 		}
 		
@@ -170,16 +186,25 @@ public class Plate {
 
 	/**
 	 * Add crust to plate as result of continental collision.
-	 * @param x X coordinate of location of new crust on world map.
-	 * @param y Y coordinate of location of new crust on world map.
+	 * @param worldX X coordinate of location of new crust on world map.
+	 * @param worldY Y coordinate of location of new crust on world map.
 	 * @param amount Amount of crust to add. (units?)
 	 * @param creationTime Time of creation of new crust.
 	 */
-	void addCrustByCollision(int x, int y, float amount, int creationTime) {
-		setCrust(x, y, getCrust(x, y) + amount, creationTime);
-		int tile = getLocalTile(x, y);
-		int xLocal = getLocalX(x);
-		int yLocal = getLocalY(y);
+	void addCrustByCollision(int worldX, int worldY, float amount, int creationTime) {
+		setCrust(worldX, worldY, getCrust(worldX, worldY) + amount, creationTime);
+		int plateTile = getLocalTile(worldX, worldY);
+		assert (plateTile < heightMap.length);	// aggregation went overboard
+		segmentOwnerMap[plateTile] = activeContinentID;
+		CollisionSegment seg = collisionSegments.get(activeContinentID);
+		seg.Area++;
+		
+		int xLocal = getLocalX(worldX);
+		int yLocal = getLocalY(worldY);
+		if (xLocal < seg.X0) seg.X0 = xLocal;
+		if (xLocal > seg.X1) seg.X1 = xLocal;
+		if (yLocal < seg.Y0) seg.Y0 = yLocal;
+		if (yLocal > seg.Y1) seg.Y1 = yLocal;
 	}
 	
 	/**
@@ -249,21 +274,23 @@ public class Plate {
 	 * @return Amount of crust added to destination plate.
 	 */
 	float aggregateCrust(Plate plate, int worldX, int worldY) {
-		int mapTile = getLocalTile(worldX, worldY);
 		int localX = getLocalX(worldX);
 		int localY = getLocalY(worldY);
+		int mapTile = getLocalTile(worldX, worldY);
+		assert(mapTile < heightMap.length);	// Aggregating beyond plate limits.
 		
 		int segmentID = segmentOwnerMap[mapTile];
+		assert(segmentID < collisionSegments.size());	// Aggregating without deforming first
 		CollisionSegment segment = collisionSegments.elementAt(segmentID); 
 		if (segment.Area == 0)
 			return 0;	// Ignore empty continents.
 		
 		plate.selectCollisionSegment(worldX, worldY);
-		worldX += mapSize; worldY += mapSize;
+		worldX += mapSize; worldY += mapSize;	// prevent subtractions from going negative
 		
 		float M_old = M;
-		for (int iY = segment.Y0; iY < segment.Y1; iY++) {
-			for (int iX = segment.X0; iX < segment.X1; iX++) {
+		for (int iY = segment.Y0; iY <= segment.Y1; iY++) {
+			for (int iX = segment.X0; iX <= segment.X1; iX++) {
 				int activeTile = iY * width + iX;
 				if (segmentOwnerMap[activeTile] == segmentID && heightMap[activeTile] > 0) {
 					plate.addCrustByCollision(worldX + localX - iX, worldY + localY - iY, heightMap[activeTile], timestampMap[activeTile]);
@@ -517,6 +544,7 @@ public class Plate {
 		
 		int oldLeft = left, oldTop = top;
 		left += getVelocityX() * getVelocity();
+		// These are "if" and not "while" so that bad velocity can be tracked and fixed.
 		if (left <= 0) left += mapSize;
 		if (left >= mapSize) left -= mapSize;
 		
@@ -569,7 +597,8 @@ public class Plate {
 	 */
 	void setCrust(int worldX, int worldY, float amount, int timeStamp) {
 		assert(!Float.isNaN(amount));
-		assert(worldX >= 0 && worldX < mapSize && worldY >= 0 && worldY < mapSize);
+		worldX %= mapSize; worldY %= mapSize;
+		//assert(worldX >= 0 && worldX < mapSize && worldY >= 0 && worldY < mapSize);
 		
 		if (amount < 0) amount = 0;	//negative mass is unlikely
 		
