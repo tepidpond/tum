@@ -120,9 +120,6 @@ public class Plate {
 		int area = width * height;
 		double angle = 2 * Math.PI * rand.nextDouble();
 		
-		if (plateData == null)
-			return;
-		
 		// Save basic pre-defined data.
 		this.heightMap = new float[area];
 		this.timestampMap = new int[area];
@@ -179,8 +176,10 @@ public class Plate {
 		if (newSegment >= collisionSegments.size())
 			newSegment = createSegment(xLocal, yLocal);
 		
-		collisionSegments.elementAt(newSegment).Collisions++;
-		return collisionSegments.elementAt(newSegment).Area;
+		assert newSegment < collisionSegments.size(): "Could not create new segment.";
+		
+		collisionSegments.get(newSegment).Collisions++;
+		return collisionSegments.get(newSegment).Area;
 	}
 	
 
@@ -194,7 +193,7 @@ public class Plate {
 	void addCrustByCollision(int worldX, int worldY, float amount, int creationTime) {
 		setCrust(worldX, worldY, getCrust(worldX, worldY) + amount, creationTime);
 		int plateTile = getLocalTile(worldX, worldY);
-		assert (plateTile < heightMap.length);	// aggregation went overboard
+		assert plateTile < heightMap.length: "Aggregation went overboard.";
 		segmentOwnerMap[plateTile] = activeContinentID;
 		CollisionSegment seg = collisionSegments.get(activeContinentID);
 		seg.Area++;
