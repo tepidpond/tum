@@ -61,25 +61,6 @@ public class Plate {
 			_vX = _vY = _velocity = 0;
 		}
 	}
-	private void updateVelocity() {
-		float vX = getVelocityX(), vY = getVelocityY(), vel = getVelocity();
-		float dX = getImpulseX(), dY = getImpulseY(), acc = getImpulse();
-		
-		vX += dX; vY += dY;
-		setImpulse(0f, 0f, 0f);
-		
-		float normFactor = (float)Math.sqrt(vX * vX + vY * vY);
-		assert(!Float.isNaN(normFactor));
-		if (normFactor > 0 && vel > 0) {
-			vX /= normFactor;
-			vY /= normFactor;
-			vel += normFactor - 1.0f;
-		} else {
-			vX = vY = vel = 0;
-		}
-		
-		setVelocity(vX, vY, vel);
-	}	
 	private float getImpulseX() { return _dY;}
 	private float getImpulseY() { return _dX;}
 	private float getImpulse() { return _acceleration;}
@@ -111,7 +92,7 @@ public class Plate {
 		this.mapSize = mapSize;
 		this.M = 0;
 		this.left = xOrigin;
-		this.top = xOrigin;
+		this.top = yOrigin;
 		this.rand = rand;
 		R_x = 0;
 		R_y = 0;
@@ -126,9 +107,10 @@ public class Plate {
 		this.segmentOwnerMap = new int[area];
 		
 		// Establish initial velocity and direction.
-		setVelocity ((float)Math.cos(angle) * INITIAL_SPEED,
-		             (float)Math.sin(angle) * INITIAL_SPEED,
-		             1.0f);
+		_vX = (float)Math.cos(angle) * INITIAL_SPEED;
+		_vY = (float)Math.sin(angle) * INITIAL_SPEED;
+		_velocity = 1.0f;
+		
 		// Intended for random circular motion of plate. Unused.
 		//this.alpha = -rand.nextInt(1) * Math.PI * 0.01 * rand.nextFloat();
 		Arrays.fill(segmentOwnerMap, 255);
@@ -191,9 +173,10 @@ public class Plate {
 	 * @param creationTime Time of creation of new crust.
 	 */
 	void addCrustByCollision(int worldX, int worldY, float amount, int creationTime) {
+		worldX %= mapSize; worldY %= mapSize;
 		setCrust(worldX, worldY, getCrust(worldX, worldY) + amount, creationTime);
 		int plateTile = getLocalTile(worldX, worldY);
-		assert plateTile < heightMap.length: "Aggregation went overboard.";
+		assert plateTile < heightMap.length && plateTile >= 0: String.format("Aggregation went overboard: (%d, %d) in [%d,%d]-[%d,%d]", worldX, worldY, left, top, left + width - 1, top + height - 1);
 		segmentOwnerMap[plateTile] = activeContinentID;
 		CollisionSegment seg = collisionSegments.get(activeContinentID);
 		seg.Area++;
@@ -214,17 +197,18 @@ public class Plate {
 	 * subducting slab has reached certain depth where the heat triggers
 	 * the melting and uprising of molten magma.
 	 * 
-	 * @param x X coordinate of origin of subduction on world map.
-	 * @param y Y coordinate of origin of subduction on world map.
+	 * @param worldX X coordinate of origin of subduction on world map.
+	 * @param worldY Y coordinate of origin of subduction on world map.
 	 * @param amount Amount of sediment that subducts.
 	 * @param creationTime Time of creation of new crust.
 	 * @param dX X direction of the subducting plate.
 	 * @param dY Y direction of the subducting plate.
 	 */
-	void addCrustBySubduction(int x, int y, float amount, int creationTime, float dX, float dY) {
+	void addCrustBySubduction(int worldX, int worldY, float amount, int creationTime, float dX, float dY) {
 		assert(!Float.isNaN(amount));
+		assert getLocalTile(worldX, worldY) < width * height: "Subduction origin not on plate!";
 		
-		int localX = getLocalX(x), localY = getLocalY(y);
+		int localX = getLocalX(worldX), localY = getLocalY(worldY);
 		
 		float dotProduct = getVelocityX() * dX + getVelocityY() * dY;
 		if (dotProduct > 0) {
@@ -232,25 +216,26 @@ public class Plate {
 			dY -= getVelocityY();
 		}
 		
-		float offset = 3.0f * (float)Math.pow(rand.nextFloat(), 3.0D) * (2 * rand.nextInt(1) - 1);
+		// o = +- 3 * R^3
+		float offset = (rand.nextBoolean() ? 1 : -1) * 3.0f * (float)Math.pow(rand.nextFloat(), 3.0D);
 		dX = 10 * dX + offset;
 		dY = 10 * dY + offset;
 		
 		localX += dX;
 		localY += dY;
 		
-		if (width == mapSize) x &= width - 1;
-		if (height == mapSize) x &= height - 1;
+		if (width == mapSize) localX %= width;
+		if (height == mapSize) localY %= height;
 		
-		int mapTile = y * width + x;
-		if (mapTile < width * height && heightMap[mapTile] > 0) {
-			creationTime = (timestampMap[mapTile] + creationTime)/2;
+		int localTile = localY * width + localX;
+		if (localTile < width * height && localTile >= 0 && heightMap[localTile] > 0) {
+			creationTime = (timestampMap[localTile] + creationTime)/2;
 			if (amount > 0)
-				timestampMap[mapTile] = creationTime;
+				timestampMap[localTile] = creationTime;
 			else
-				timestampMap[mapTile] = 0;
+				timestampMap[localTile] = 0;
 			
-			heightMap[mapTile] += amount;
+			heightMap[localTile] += amount;
 			M += amount;
 		}
 	}
@@ -275,24 +260,42 @@ public class Plate {
 	float aggregateCrust(Plate plate, int worldX, int worldY) {
 		int localX = getLocalX(worldX);
 		int localY = getLocalY(worldY);
-		int mapTile = getLocalTile(worldX, worldY);
-		assert(mapTile < heightMap.length);	// Aggregating beyond plate limits.
+		int localTile = getLocalTile(worldX, worldY);
+		assert localTile < heightMap.length: "Aggregating beyond plate limits!";
 		
-		int segmentID = segmentOwnerMap[mapTile];
-		assert(segmentID < collisionSegments.size());	// Aggregating without deforming first
-		CollisionSegment segment = collisionSegments.elementAt(segmentID); 
+		int segmentID = segmentOwnerMap[localTile];
+		
+		// This check forces the caller to do things in proper order!
+		//
+		// Usually continents collide at several locations simultaneously.
+		// Thus if this segment that is being merged now is removed from
+		// segmentation bookkeeping, then the next point of collision that is
+		// processed during the same iteration step would cause the test
+		// below to be true and system would experience a premature abort.
+		//
+		// Therefore, segmentation bookkeeping is left intact. It doesn't
+		// cause significant problems because all crust is cleared and empty
+		// points are not processed at all.		
+		assert segmentID < collisionSegments.size(): "Trying to aggregate without deforming first!";
+		CollisionSegment segment = collisionSegments.elementAt(segmentID);
+		
+		// One continent may have many points of collision. If one of them
+		// causes continent to aggregate then all successive collisions and
+		// attempts of aggregation would necessarily change nothing at all,
+		// because the continent was removed from this plate earlier!		
 		if (segment.Area == 0)
 			return 0;	// Ignore empty continents.
 		
 		plate.selectCollisionSegment(worldX, worldY);
-		worldX += mapSize; worldY += mapSize;	// prevent subtractions from going negative
+		// Wrap coordinates around world edges to safeguard subtractions.
+		worldX += mapSize; worldY += mapSize;
 		
 		float M_old = M;
 		for (int iY = segment.Y0; iY <= segment.Y1; iY++) {
 			for (int iX = segment.X0; iX <= segment.X1; iX++) {
 				int activeTile = iY * width + iX;
 				if (segmentOwnerMap[activeTile] == segmentID && heightMap[activeTile] > 0) {
-					plate.addCrustByCollision(worldX + localX - iX, worldY + localY - iY, heightMap[activeTile], timestampMap[activeTile]);
+					plate.addCrustByCollision(worldX + iX - localX, worldY + iY - localY, heightMap[activeTile], timestampMap[activeTile]);
 					
 					M -= heightMap[activeTile];
 					heightMap[activeTile] = 0;
@@ -300,7 +303,7 @@ public class Plate {
 			}
 		}
 		
-		segment.Area = 0;
+		segment.Area = 0;	// Mark segment as non-existent.
 		return M_old - M;
 	}
 	
@@ -340,6 +343,25 @@ public class Plate {
 	void collide(Plate plate, int worldX, int worldY, float collidingMass) {
 		float coefficientRestitution = 0.0f;
 		
+		// Calculate the normal to the curve/line at collision point.
+		// The normal will point into plate B i.e. the "other" plate.
+		//
+		// Plates that wrap over world edges can mess the normal vector.
+		// This could be solved by choosing the normal vector that points the
+		// shortest path between mass centers but this causes problems when
+		// plates are like heavy metal balls at a long rod and one plate's ball
+		// collides at the further end of other plate's rod. Sure, this is
+		// nearly never occurring situation but if we can easily do better then
+		// why not do it?
+		//
+		// Better way is to select that normal vector that points along the
+		// line that passes nearest the point of collision. Because point's
+		// distance from line segment is relatively cumbersome to perform, the
+		// vector is constructed as the sum of vectors <massCenterA, P> and
+		// <P, massCenterB>. This solution works because collisions always
+		// happen in the overlapping region of the two plates.
+		//float pltA_dX, pltA_dY, pltB_dX, pltB_dY, normalX, normalY;
+		
 		int plateA_X = this.getLocalX(worldX), plateA_Y = this.getLocalY(worldY);
 		int plateB_X = plate.getLocalX(worldX), plateB_Y = plate.getLocalY(worldY);
 		int plateA_Tile = this.getLocalTile(worldX, worldY);
@@ -352,24 +374,29 @@ public class Plate {
 		float collision_X = plateA_dX - plateB_dX;
 		float collision_Y = plateA_dY - plateB_dY;
 		
+		// Scaling is required at last when impulses are added to plates!
 		float magnitude = (float)Math.sqrt(collision_X * collision_X + collision_Y * collision_Y);
 		assert(magnitude > 0);
 		collision_X /= magnitude; collision_Y /= magnitude;	// normalize collision vector
 		
+		// Compute relative velocity between plates at the collision point.
+		// Because torque is not included, calc simplifies to v_ab = v_a - v_b.
 		float relative_X = getVelocityX() - plate.getVelocityX(), relative_Y = getVelocityY() - plate.getVelocityY();	// find relative velocity vector
 		float dotProduct = relative_X * collision_X + relative_Y * collision_Y;
 		
 		if (dotProduct <= 0)
 			return;	// plates moving away from each other.
 		
-		float denominatorOfImpulse = (float)(Math.pow(magnitude, 2.0) * (1.0/M + 1.0/collidingMass));
+		float denominatorOfImpulse = (collision_X * collision_X + collision_Y * collision_Y) * (1.0f/M + 1.0f/collidingMass);
 		
 		// force of impulse
 		float J = -(1 + coefficientRestitution) * dotProduct / denominatorOfImpulse;
 		
 		// Finally apply an acceleration;
-		this.addImpulse(collision_X * J / M, collision_Y * J / M, 1.0f);
-		plate.addImpulse(-collision_X * J / (collidingMass + plate.M), -collision_Y * J / (collidingMass + plate.M), 1.0f);
+		_dX += collision_X * J / M;
+		_dY += collision_Y * J / M;
+		plate._dX -= collision_X * J / (collidingMass + plate.M);
+		plate._dY -= collision_X * J / (collidingMass + plate.M);
 	}
 	
 	/**
@@ -495,7 +522,7 @@ public class Plate {
 	 */
 	float getCrust(int x, int y) {
 		int tileLocal = getLocalTile(x, y);
-		if (tileLocal<0 || tileLocal > timestampMap.length) return 0;
+		if (tileLocal<0 || tileLocal >= heightMap.length) return 0;
 		
 		return heightMap[tileLocal];
 	}
@@ -534,22 +561,25 @@ public class Plate {
 	 * Moves plate along its trajectory.
 	 */
 	void move() {
-		updateVelocity();
-		updatePosition();
-	}
-	private void updatePosition() {
 		// Plate out of bounds here.
 		assert(left >= 0 && left <= mapSize && top >= 0 && top <= mapSize);
+
+		_vX += _dX; _vY += _dY;
+		_dX = _dY = 0;
 		
-		int oldLeft = left, oldTop = top;
-		left += getVelocityX() * getVelocity();
-		// These are "if" and not "while" so that bad velocity can be tracked and fixed.
-		if (left <= 0) left += mapSize;
-		if (left >= mapSize) left -= mapSize;
+		float len = (float)Math.sqrt(_vX * _vX + _vY * _vY);
+		_vX /= len;
+		_vY /= len;
+		_velocity += len - 1.0f;
+		_velocity *= _velocity > 0 ? 1 : 0;
+
+		left += _vX * _velocity;
+		top += top > 0 ? 0 : mapSize;
+		top -= top < mapSize ? 0 : mapSize;
 		
-		top += getVelocityY() * getVelocity();
-		if (top <= 0) top += mapSize;
-		if (top >= mapSize) top -= mapSize;
+		top += _vY * _velocity;
+		top += top > 0 ? 0 : mapSize;
+		top -= top < mapSize ? 0 : mapSize;
 		
 		// Plate out of bounds here.
 		assert(left >= 0 && left <= mapSize && top >= 0 && top <= mapSize);
