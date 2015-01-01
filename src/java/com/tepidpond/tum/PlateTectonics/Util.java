@@ -8,6 +8,9 @@ import java.io.File;
 import javax.imageio.ImageIO;
 
 public class Util {
+	// TODO: Derived from Google search. May be horribly wrong.
+	public static final float FLT_EPSILON = 1.19209290e-07f;
+	
 	public static final int getTile(int x, int y, int mapSize) {
 		// heightmap is a torus
 		return getTile(x, y, mapSize, mapSize);
@@ -27,7 +30,7 @@ public class Util {
 		saveHeightmap(heightMap, mapWidth, mapWidth, tag);
 	}
 	public static final void saveHeightmap(float heightMap[], int mapWidth, int mapHeight, String tag) {
-		float hm[] = normalizeHeightMapCopy(heightMap);
+		float hm[] = heightMap; //normalizeHeightMapCopy(heightMap);
 		BufferedImage bi = new BufferedImage(mapWidth, mapHeight, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D g = bi.createGraphics();
 		for (int x=0; x<mapWidth; x++) {

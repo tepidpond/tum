@@ -413,34 +413,34 @@ public class Plate {
 		
 		for (int y = 0; y < height; y++) {
 			for (int x = 0; x < width; x++) {
-				int mapTile = y * width + x;
-				M += heightMap[mapTile];
-				assert(!Float.isNaN(heightMap[mapTile]));
-				newHeightmap[mapTile] += heightMap[mapTile];
+				int plateTile = y * width + x;
+				M += heightMap[plateTile];
+				assert(!Float.isNaN(heightMap[plateTile]));
+				newHeightmap[plateTile] += heightMap[plateTile];
 				
 				// Update R (center of mass)
-				R_x += x * heightMap[mapTile];
-				R_y += y * heightMap[mapTile];
-				if (heightMap[mapTile] < lowerBound)
+				R_x += x * heightMap[plateTile];
+				R_y += y * heightMap[plateTile];
+				if (heightMap[plateTile] < lowerBound)
 					continue;	// eroded too far already, no more
 				
-				int mapTileN = Math.max(0, (y - 1)) * width + x;
-				int mapTileS = Math.min(height - 1, (y + 1)) * width + x;
-				int mapTileW = y * width + Math.max(0, x - 1);
-				int mapTileE = y * width + Math.min(width - 1, x + 1);
+				int plateTileN = Math.max(0, (y - 1)) * width + x;
+				int plateTileS = Math.min(height - 1, (y + 1)) * width + x;
+				int plateTileW = y * width + Math.max(0, x - 1);
+				int plateTileE = y * width + Math.min(width - 1, x + 1);
 				
 				float heightN = 0, heightS = 0, heightW = 0, heightE = 0;
-				if (y > 0)          heightN = heightMap[mapTileN];
-				if (y < height - 1) heightS = heightMap[mapTileS];
-				if (x > 0)          heightW = heightMap[mapTileW];
-				if (x < width - 1)  heightE = heightMap[mapTileE];
+				if (y > 0)          heightN = heightMap[plateTileN];
+				if (y < height - 1) heightS = heightMap[plateTileS];
+				if (x > 0)          heightW = heightMap[plateTileW];
+				if (x < width - 1)  heightE = heightMap[plateTileE];
 				if (heightN + heightS + heightW + heightE == 0)
 					continue;	// no neighbors
 				
-				float diffN = heightMap[mapTile] - heightN;
-				float diffS = heightMap[mapTile] - heightS;
-				float diffW = heightMap[mapTile] - heightW;
-				float diffE = heightMap[mapTile] - heightE;
+				float diffN = heightMap[plateTile] - heightN;
+				float diffS = heightMap[plateTile] - heightS;
+				float diffW = heightMap[plateTile] - heightW;
+				float diffE = heightMap[plateTile] - heightE;
 				float minDiff = Math.min(Math.min(diffN, diffS), Math.min(diffW, diffE));
 				float diffSum = (heightN > 0 ? (diffN - minDiff) : 0.0f) + 
 								(heightS > 0 ? (diffS - minDiff) : 0.0f) + 
@@ -449,29 +449,29 @@ public class Plate {
 				
 				if (diffSum > 0) {
 					if (diffSum < minDiff) {
-						newHeightmap[mapTileN] += (heightN > 0)?(diffN - minDiff):0;
-						newHeightmap[mapTileS] += (heightS > 0)?(diffS - minDiff):0;
-						newHeightmap[mapTileW] += (heightW > 0)?(diffW - minDiff):0;
-						newHeightmap[mapTileE] += (heightE > 0)?(diffE - minDiff):0;
-						newHeightmap[mapTile] -= diffSum;
+						newHeightmap[plateTileN] += (heightN > 0)?(diffN - minDiff):0;
+						newHeightmap[plateTileS] += (heightS > 0)?(diffS - minDiff):0;
+						newHeightmap[plateTileW] += (heightW > 0)?(diffW - minDiff):0;
+						newHeightmap[plateTileE] += (heightE > 0)?(diffE - minDiff):0;
+						newHeightmap[plateTile] -= diffSum;
 						minDiff -= diffSum;
 						minDiff /= 1 + (heightN > 0?1:0) + (heightS > 0?1:0) +
 						               (heightW > 0?1:0) + (heightE > 0?1:0);
 						assert(!Float.isNaN(minDiff));
 						
-						newHeightmap[mapTileN] += (heightN > 0)?(minDiff):0;
-						newHeightmap[mapTileS] += (heightS > 0)?(minDiff):0;
-						newHeightmap[mapTileW] += (heightW > 0)?(minDiff):0;
-						newHeightmap[mapTileE] += (heightE > 0)?(minDiff):0;
+						newHeightmap[plateTileN] += (heightN > 0)?(minDiff):0;
+						newHeightmap[plateTileS] += (heightS > 0)?(minDiff):0;
+						newHeightmap[plateTileW] += (heightW > 0)?(minDiff):0;
+						newHeightmap[plateTileE] += (heightE > 0)?(minDiff):0;
 					} else {
 						// Remove the erodable crust from the tile
-						newHeightmap[mapTile] -= minDiff;
+						newHeightmap[plateTile] -= minDiff;
 						float crustToShare = minDiff / diffSum;
 						// And spread it over the four neighbors.
-						newHeightmap[mapTileN] += crustToShare * (heightN > 0?diffN - minDiff:0);
-						newHeightmap[mapTileS] += crustToShare * (heightS > 0?diffS - minDiff:0);
-						newHeightmap[mapTileW] += crustToShare * (heightW > 0?diffW - minDiff:0);
-						newHeightmap[mapTileE] += crustToShare * (heightE > 0?diffE - minDiff:0);
+						newHeightmap[plateTileN] += crustToShare * (heightN > 0?diffN - minDiff:0);
+						newHeightmap[plateTileS] += crustToShare * (heightS > 0?diffS - minDiff:0);
+						newHeightmap[plateTileW] += crustToShare * (heightW > 0?diffW - minDiff:0);
+						newHeightmap[plateTileE] += crustToShare * (heightE > 0?diffE - minDiff:0);
 					}
 				}
 			}
@@ -494,8 +494,8 @@ public class Plate {
 	 */
 	CollisionStatistic getCollisionInfo(int worldX, int worldY) {
 		int localX = getLocalX(worldX), localY = getLocalY(worldY);
-		int mapTile = getLocalTile(worldX, worldY);
-		int segmentID = segmentOwnerMap[mapTile];
+		int plateTile = getLocalTile(worldX, worldY);
+		int segmentID = segmentOwnerMap[plateTile];
 		CollisionSegment segment = collisionSegments.elementAt(segmentID);
 		
 		return new CollisionStatistic(segment.Collisions, segment.Collisions / (1.0f + segment.Area));		
@@ -509,8 +509,7 @@ public class Plate {
 	 * @return Area of continent at desired location or 0 if none.
 	 */
 	int getContinentArea(int worldX, int worldY) {
-		int mapTile = getLocalTile(worldX, worldY);
-		return collisionSegments.elementAt(mapTile).Area;
+		return collisionSegments.elementAt(getLocalTile(worldX, worldY)).Area;
 	}
 	
 	/**
@@ -600,7 +599,7 @@ public class Plate {
 	 */
 	void resetSegments() {
 		collisionSegments.removeAllElements();
-		Arrays.fill(segmentOwnerMap, 255);
+		Arrays.fill(segmentOwnerMap, Integer.MAX_VALUE);
 	}
 	
 	/**
@@ -610,8 +609,7 @@ public class Plate {
 	 * @param y Y coordinate of origin of collision on world map.
 	 */
 	void selectCollisionSegment(int x, int y) {
-		int mapTile = getLocalTile(x, y);
-		activeContinentID = segmentOwnerMap[mapTile];
+		activeContinentID = segmentOwnerMap[getLocalTile(x, y)];
 	}
 
 	/**
@@ -744,10 +742,10 @@ public class Plate {
 		while (!border.IsEmpty()) {
 			// choose random location on border 
 			int borderIndex = rand.nextInt(border.size());
-			int mapTile = border.Peek(borderIndex);
+			int plateTile = border.Peek(borderIndex);
 			
-			int x = Util.getX(mapTile, width);
-			int y = Util.getY(mapTile, width);
+			int x = Util.getX(plateTile, width);
+			int y = Util.getY(plateTile, width);
 			
 			// in the 4 cardinal directions, clamp at border.
 			int tileN, tileS, tileW, tileE;
