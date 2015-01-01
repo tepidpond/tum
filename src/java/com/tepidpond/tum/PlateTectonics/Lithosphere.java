@@ -105,7 +105,7 @@ public class Lithosphere {
 		System.arraycopy(worldPlates, 0, prevIndexMap, 0, worldPlates.length);
 		Arrays.fill(worldMap, 0);
 		Arrays.fill(worldPlates, Integer.MAX_VALUE);
-		int ageMap[] = new int[worldSurface];
+		int worldAgeMap[] = new int[worldSurface];
 		
 		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
 			Plate p = plates[activePlate];
@@ -127,9 +127,9 @@ public class Lithosphere {
 						// plate to have crust on it.
 						worldMap[worldTile] = plateMap[plateTile];
 						worldPlates[worldTile] = activePlate;
-						ageMap[worldTile] = plateAge[plateTile];
+						worldAgeMap[worldTile] = plateAge[plateTile];
 					} else {					
-						continentalCollisions += collectCollisions(ageMap, activePlate, xMod, yMod, plateTile, worldTile);
+						continentalCollisions += collectCollisions(worldAgeMap, activePlate, xMod, yMod, plateTile, worldTile);
 					}
 				}
 			} // for y... { for x ...
@@ -138,9 +138,9 @@ public class Lithosphere {
 		if (continentalCollisions == 0) generationsSinceCollision++; else generationsSinceCollision = 0;
 		processSubductions();
 		processCollisions();
-		regenerateCrust(prevIndexMap, ageMap);
+		regenerateCrust(prevIndexMap, worldAgeMap);
 
-		addSeaFloorUplift(ageMap);
+		addSeaFloorUplift(worldAgeMap);
 		
 		generations++;
 		return true;
@@ -337,6 +337,7 @@ public class Lithosphere {
 		ArrayList<Integer> plateCenters = new ArrayList<Integer>();
 		int worldTile;
 		for (int i = 0; i < numPlates; i++) {
+			// This loop ensures no sharing of plate centers.
 			do {
 				worldTile = rand.nextInt(worldSurface);
 			} while (plateCenters.contains(worldTile));
