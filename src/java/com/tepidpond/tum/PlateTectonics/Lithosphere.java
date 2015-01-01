@@ -88,6 +88,9 @@ public class Lithosphere {
 		PlateArea[] plates = createPlates();
 		growPlates(plates);
 		this.plates = extractPlates(plates);
+		// Prevent any initial buoyancy from altering first heightmap.
+		generations = numPlates + MAX_BUOYANCY_AGE;
+		generationsSinceCollision = 0;
 	}
 	
 	public boolean Update() {
