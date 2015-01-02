@@ -11,7 +11,6 @@ import scala.collection.generic.BitOperations.Int;
 public class Plate {
 	private static final float DEFORMATION_WEIGHT = 5f;
 	private static final float INITIAL_SPEED = 1.0f;
-	private static final float CONT_BASE = 1.0f;
 	
 	private int activeContinentID;
 	private Vector<CollisionSegment> collisionSegments = new Vector<CollisionSegment>();
@@ -756,25 +755,25 @@ public class Plate {
 			
 			// If the N/S/E/W tile is un-owned, claim it for the active segment
 			// and add it to the border.
-			if (segmentOwnerMap[tileN] > newSegmentID && heightMap[tileN] >= CONT_BASE) {
+			if (segmentOwnerMap[tileN] > newSegmentID && heightMap[tileN] >= Lithosphere.CONTINENTAL_BASE) {
 				segmentOwnerMap[tileN] = newSegmentID;
 				border.Push(tileN);
 				newSegment.Area++;
 				newSegment.UpdateBoundsToInclude(Util.getX(tileN, width), Util.getY(tileN, width));
 			}
-			if (segmentOwnerMap[tileS] > newSegmentID && heightMap[tileS] >= CONT_BASE) {
+			if (segmentOwnerMap[tileS] > newSegmentID && heightMap[tileS] >= Lithosphere.CONTINENTAL_BASE) {
 				segmentOwnerMap[tileS] = newSegmentID;
 				border.Push(tileS);
 				newSegment.Area++;
 				newSegment.UpdateBoundsToInclude(Util.getX(tileS, width), Util.getY(tileS, width));
 			}
-			if (segmentOwnerMap[tileW] > newSegmentID && heightMap[tileW] >= CONT_BASE) {
+			if (segmentOwnerMap[tileW] > newSegmentID && heightMap[tileW] >= Lithosphere.CONTINENTAL_BASE) {
 				segmentOwnerMap[tileW] = newSegmentID;
 				border.Push(tileW);
 				newSegment.Area++;
 				newSegment.UpdateBoundsToInclude(Util.getX(tileW, width), Util.getY(tileW, width));
 			}
-			if (segmentOwnerMap[tileE] > newSegmentID && heightMap[tileE] >= CONT_BASE) {
+			if (segmentOwnerMap[tileE] > newSegmentID && heightMap[tileE] >= Lithosphere.CONTINENTAL_BASE) {
 				segmentOwnerMap[tileE] = newSegmentID;
 				border.Push(tileE);
 				newSegment.Area++;
@@ -785,6 +784,8 @@ public class Plate {
 			border.set(borderIndex, border.Peek());
 			border.Pop();
 		}
+		System.out.printf("New segment created, [%d,%d]-[%d,%d](%dx%d) @ (%d,%d).\n",
+				newSegment.X0, newSegment.Y0, newSegment.X1, newSegment.Y1, newSegment.getW(), newSegment.getH(), localX, localY);
 		
 		collisionSegments.addElement(newSegment);		
 		return newSegmentID;
@@ -793,36 +794,36 @@ public class Plate {
 	private int checkNeighboringSegment(int localX, int localY) {
 		int origin_index = localY * width + localX;
 
-		int newSegmentID = collisionSegments.size();
-		int adjTileSegmentID = newSegmentID;
+		int segNew = collisionSegments.size();
+		int segNeighbor = segNew;
 		if ((localX > 0) &&
-			heightMap[origin_index-1] >= CONT_BASE &&
-			segmentOwnerMap[origin_index-1] < newSegmentID) {
-			adjTileSegmentID = segmentOwnerMap[origin_index - 1];
+			heightMap[origin_index-1] >= Lithosphere.CONTINENTAL_BASE &&
+			segmentOwnerMap[origin_index-1] < segNew) {
+				segNeighbor = segmentOwnerMap[origin_index - 1];
 		} else if ((localX < width - 1) &&
-				heightMap[origin_index+1] >= CONT_BASE &&
-				segmentOwnerMap[origin_index+1] < newSegmentID) {
-				adjTileSegmentID = segmentOwnerMap[origin_index + 1];
+			heightMap[origin_index+1] >= Lithosphere.CONTINENTAL_BASE &&
+			segmentOwnerMap[origin_index+1] < segNew) {
+				segNeighbor = segmentOwnerMap[origin_index + 1];
 		} else if ((localY > 0) &&
-				heightMap[origin_index - width] >= CONT_BASE &&
-				segmentOwnerMap[origin_index - width] < newSegmentID) {
-				adjTileSegmentID = segmentOwnerMap[origin_index - width];
+			heightMap[origin_index - width] >= Lithosphere.CONTINENTAL_BASE &&
+			segmentOwnerMap[origin_index - width] < segNew) {
+				segNeighbor = segmentOwnerMap[origin_index - width];
 		} else if ((localY < height - 1) &&
-				heightMap[origin_index + width] >= CONT_BASE &&
-				segmentOwnerMap[origin_index + width] < newSegmentID) {
-				adjTileSegmentID = segmentOwnerMap[origin_index + width];
+			heightMap[origin_index + width] >= Lithosphere.CONTINENTAL_BASE &&
+			segmentOwnerMap[origin_index + width] < segNew) {
+				segNeighbor = segmentOwnerMap[origin_index + width];
 		}
-		if (adjTileSegmentID < newSegmentID) {
+		if (segNeighbor < segNew) {
 			// A neighbor exists, this tile should be added to it instead
-			segmentOwnerMap[origin_index] = adjTileSegmentID;
-			CollisionSegment segment = collisionSegments.elementAt(adjTileSegmentID);
+			segmentOwnerMap[origin_index] = segNeighbor;
+			CollisionSegment segment = collisionSegments.elementAt(segNeighbor);
 			segment.Area++;
 			if (localX > segment.X0) segment.X0 = localX;
 			if (localX > segment.X1) segment.X1 = localX;
 			if (localY < segment.Y0) segment.Y0 = localY;
-			if (localY < segment.Y1) segment.Y1 = localY;
+			if (localY > segment.Y1) segment.Y1 = localY;
 		}		
-		return adjTileSegmentID;
+		return segNeighbor;
 	}
 
 	/**

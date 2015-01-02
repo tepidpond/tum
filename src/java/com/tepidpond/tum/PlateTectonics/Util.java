@@ -36,7 +36,14 @@ public class Util {
 		for (int x=0; x<mapWidth; x++) {
 			for (int y=0; y<mapHeight; y++) {
 				float h = hm[getTile(x, y, mapWidth, mapHeight)];
-				g.setColor(new Color(Color.HSBtoRGB(1.0f, 0.0f, h)));
+				if (h<0.0)
+					g.setColor(new Color(1.0f, 0.0f, 0.0f));
+				else if (h < 0.5)
+					g.setColor(new Color(h, h, h / 2f));
+				else if (h <= 1.0f)
+					g.setColor(new Color(h, h, h));
+				else
+					g.setColor(new Color(1.0f, 1.0f, 1.0f));
 				g.drawLine(x, y, x, y);
 			}
 		}

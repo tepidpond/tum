@@ -14,4 +14,6 @@ public class CollisionSegment {
 		if (y < Y0) Y0 = y;
 		if (y > Y1) Y1 = y;
 	}
+	public int getW() { return X1 - X0 + 1; }
+	public int getH() { return Y1 - Y0 + 1; }
 }

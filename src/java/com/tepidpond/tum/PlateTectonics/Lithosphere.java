@@ -7,7 +7,7 @@ import java.util.Random;
 
 public class Lithosphere {
 	private static final float SQRDMD_ROUGHNESS = 0.5f;
-	private static final float CONTINENTAL_BASE = 1.0f;
+	public static final float CONTINENTAL_BASE = 1.0f;
 	private static final float OCEANIC_BASE =     0.1f;
 	private static final float RESTART_ENERGY_RATIO = 0.15f;
 	private static final float RESTART_SPEED_LIMIT = 2.0f;
@@ -101,8 +101,8 @@ public class Lithosphere {
 		
 		moveAndErodePlates();
 		int continentalCollisions = 0;
-		float prevIndexMap[] = new float[worldPlates.length];
-		System.arraycopy(worldPlates, 0, prevIndexMap, 0, worldPlates.length);
+		float worldPlatesOld[] = new float[worldPlates.length];
+		System.arraycopy(worldPlates, 0, worldPlatesOld, 0, worldPlates.length);
 		Arrays.fill(worldMap, 0);
 		Arrays.fill(worldPlates, Integer.MAX_VALUE);
 		int worldAgeMap[] = new int[worldSurface];
@@ -138,7 +138,7 @@ public class Lithosphere {
 		if (continentalCollisions == 0) generationsSinceCollision++; else generationsSinceCollision = 0;
 		processSubductions();
 		processCollisions();
-		regenerateCrust(prevIndexMap, worldAgeMap);
+		regenerateCrust(worldPlatesOld, worldAgeMap);
 
 		addSeaFloorUplift(worldAgeMap);
 		
@@ -300,16 +300,16 @@ public class Lithosphere {
 		}
 	}
 	
-	private void regenerateCrust(float[] prevIndexMap, int[] ageMap) {
+	private void regenerateCrust(float[] worldPlatesOld, int[] worldAgeMap) {
 		if (REGENERATE_CRUST) {
 			for (int y = 0; y < worldSize; y++) {
 				for (int x = 0; x < worldSize; x++) {
 					int worldTile = Util.getTile(x, y, worldSize);
 					if (worldPlates[worldTile] >= numPlates) {
-						worldPlates[worldTile] = prevIndexMap[worldTile];
-						ageMap[worldTile] = generations;
+						assert worldPlatesOld[worldTile] < numPlates: "Previous index map tile has no owner!";
+						worldPlates[worldTile] = worldPlatesOld[worldTile];
+						worldAgeMap[worldTile] = generations;
 						worldMap[worldTile] = OCEANIC_BASE * BUOYANCY_BONUS;
-						assert(!Float.isNaN(worldMap[worldTile]));
 						plates[(int) worldPlates[worldTile]].setCrust(x, y, OCEANIC_BASE, generations);
 					}
 				}
@@ -319,15 +319,15 @@ public class Lithosphere {
 	
 	/**
 	 * Adds some "virginity buoyancy" to all pixels for a visual boost.
-	 * @param ageMap
+	 * @param worldAgeMap
 	 */
-	private void addSeaFloorUplift(int[] ageMap) {
+	private void addSeaFloorUplift(int[] worldAgeMap) {
 		if (BUOYANCY_BONUS > 0) {
 			for (int worldTile = 0; worldTile < worldMap.length; worldTile++) {
-				int crustAge = MAX_BUOYANCY_AGE - (generations - ageMap[worldTile]);
+				int crustAge = (generations - worldAgeMap[worldTile]);
 				// If it has been not more than MAX_BUOYANCY_AGE generations since the sea floor
 				// was created from magma, increase the height by a decreasing amount.
-				if (crustAge <= MAX_BUOYANCY_AGE && worldMap[worldTile] < CONTINENTAL_BASE)
+				if (worldMap[worldTile] < CONTINENTAL_BASE && crustAge <= MAX_BUOYANCY_AGE)
 					worldMap[worldTile] += crustAge * BUOYANCY_BONUS * OCEANIC_BASE * (1.0f / MAX_BUOYANCY_AGE); 
 			}
 		}
