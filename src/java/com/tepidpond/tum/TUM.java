@@ -19,9 +19,9 @@ public class TUM
     public static WorldType TUMWorldType = new TUMWorldType("TUMDefault");
     
     public static void main(String[] args) {
-    	Lithosphere lithos = new Lithosphere(512, 0.65f, 60, 0.001f, 5000, 0.1f, 2, 10, 0);
+       	Lithosphere lithos = new Lithosphere(512, 0.65f, 60, 0.001f, 5000, 0.1f, 2, 10, 0);
     	for (int i=0; i<256; i++) {
-    		if (!lithos.Update()) return;
+    		if (!lithos.Update()) break;
     	}
     }
     

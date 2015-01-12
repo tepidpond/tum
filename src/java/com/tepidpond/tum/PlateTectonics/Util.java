@@ -28,6 +28,7 @@ public class Util {
 		public static void DisplayImage(BufferedImage bi) {
 			_instance.label.setIcon(new ImageIcon(bi));
 			_instance.frame.setSize(bi.getWidth(), bi.getHeight());
+			_instance.frame.setLocation(20, 20);
 			Show();
 		}
 		public static void SetCaption(String caption) {

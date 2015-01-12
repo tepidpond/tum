@@ -22,7 +22,8 @@ public class Plate {
 	// Which collision segment is responsible for the given tile.
 	private int[] segmentOwnerMap;
 	// Dimensions and locations of plate in world coordinates
-	private int left, top, width, height;
+	private float left, top;
+	private int width, height;
 	// Size of world map
 	private int mapSize;
 	
@@ -39,8 +40,8 @@ public class Plate {
 	private Random rand;
 	
 	float getMomentum()  {return M * getVelocity();}
-	int  getLeft()       {return left;}
-	int getTop()         {return top;}
+	int  getLeft()       {return (int)left;}
+	int getTop()         {return (int)top;}
 	int getHeight()      {return height;}
 	int getWidth()       {return width;}
 	Boolean isEmpty()    {return M<=0;} 
@@ -112,7 +113,7 @@ public class Plate {
 		
 		// Intended for random circular motion of plate. Unused.
 		//this.alpha = -rand.nextInt(1) * Math.PI * 0.01 * rand.nextFloat();
-		Arrays.fill(segmentOwnerMap, 255);
+		Arrays.fill(segmentOwnerMap, Integer.MAX_VALUE);
 		
 		
 		// Clone heightMap data, calculate center of mass and total mass.
@@ -132,7 +133,7 @@ public class Plate {
 				// the generation of new oceanic crust as it he plate
 				// had been moving to its current direction until all
 				// plate's (oceanic) crust receives an age.
-				this.timestampMap[tileIndex] = heightMap[tileIndex] > 0 ? plateAge : 0;
+				this.timestampMap[tileIndex] = plateData[tileIndex] > 0 ? plateAge : 0;
 				
 				assert(!Float.isNaN(heightMap[tileIndex]));
 			}
@@ -153,14 +154,15 @@ public class Plate {
 		int plateTile = getLocalTile(worldX, worldY);
 		int xLocal = getLocalX(worldX);
 		int yLocal = getLocalY(worldY);
-		int newSegment = this.segmentOwnerMap[plateTile];
-		if (newSegment >= collisionSegments.size())
-			newSegment = createSegment(xLocal, yLocal);
+		assert plateTile < heightMap.length: "Continental collision out of map bounds.";
 		
-		assert newSegment < collisionSegments.size(): "Could not create new segment.";
+		int segment = segmentOwnerMap[plateTile];
+		if (segment >= collisionSegments.size())
+			segment = createSegment(xLocal, yLocal);
+		assert segment < collisionSegments.size(): "Could not create segment.";
 		
-		collisionSegments.get(newSegment).Collisions++;
-		return collisionSegments.get(newSegment).Area;
+		collisionSegments.get(segment).Collisions++;
+		return collisionSegments.get(segment).Area;
 	}
 	
 
@@ -182,10 +184,7 @@ public class Plate {
 		
 		int xLocal = getLocalX(worldX);
 		int yLocal = getLocalY(worldY);
-		if (xLocal < seg.X0) seg.X0 = xLocal;
-		if (xLocal > seg.X1) seg.X1 = xLocal;
-		if (yLocal < seg.Y0) seg.Y0 = yLocal;
-		if (yLocal > seg.Y1) seg.Y1 = yLocal;
+		seg.UpdateBoundsToInclude(xLocal, yLocal);
 	}
 	
 	/**
@@ -204,19 +203,16 @@ public class Plate {
 	 * @param dY Y direction of the subducting plate.
 	 */
 	void addCrustBySubduction(int worldX, int worldY, float amount, int creationTime, float dX, float dY) {
-		assert(!Float.isNaN(amount));
-		assert getLocalTile(worldX, worldY) < width * height: "Subduction origin not on plate!";
-		
 		int localX = getLocalX(worldX), localY = getLocalY(worldY);
 		
-		float dotProduct = getVelocityX() * dX + getVelocityY() * dY;
+		float dotProduct = _vX * dX + _vY * dY;
 		if (dotProduct > 0) {
-			dX -= getVelocityX();
-			dY -= getVelocityY();
+			dX -= _vX;
+			dY -= _vY;
 		}
 		
 		// o = +- 3 * R^3
-		float offset = (rand.nextBoolean() ? 1 : -1) * 3.0f * (float)Math.pow(rand.nextFloat(), 3.0D);
+		float offset = (rand.nextBoolean() ? 1 : -1) * 3.0f * (float)Math.pow(rand.nextFloat(), 3.0);
 		dX = 10 * dX + offset;
 		dY = 10 * dY + offset;
 		
@@ -225,16 +221,12 @@ public class Plate {
 		
 		if (width == mapSize) localX %= width;
 		if (height == mapSize) localY %= height;
-		
-		int localTile = localY * width + localX;
-		if (localTile < width * height && localTile >= 0 && heightMap[localTile] > 0) {
-			creationTime = (timestampMap[localTile] + creationTime)/2;
-			if (amount > 0)
-				timestampMap[localTile] = creationTime;
-			else
-				timestampMap[localTile] = 0;
+		int plateTile = Util.getTile(localX, localY, width, height);
+		if (plateTile < width * height && plateTile >= 0 && heightMap[plateTile] > 0) {
+			creationTime = (timestampMap[plateTile] + creationTime)/2;
+			timestampMap[plateTile] = amount > 0 ? creationTime : 0;
 			
-			heightMap[localTile] += amount;
+			heightMap[plateTile] += amount;
 			M += amount;
 		}
 	}
@@ -286,21 +278,28 @@ public class Plate {
 			return 0;	// Ignore empty continents.
 		
 		plate.selectCollisionSegment(worldX, worldY);
-		// Wrap coordinates around world edges to safeguard subtractions.
-		worldX += mapSize; worldY += mapSize;
 		
 		float M_old = M;
+		assert segment.Y1 >= segment.Y0 && segment.X1 >= segment.X0: "Impossible continent.";
+		
 		for (int iY = segment.Y0; iY <= segment.Y1; iY++) {
 			for (int iX = segment.X0; iX <= segment.X1; iX++) {
+				int worldXSegment = iX + getLeft();
+				int worldYSegment = iY + getTop();
 				int activeTile = iY * width + iX;
-				if (segmentOwnerMap[activeTile] == segmentID && heightMap[activeTile] > 0) {
-					plate.addCrustByCollision(worldX + iX - localX, worldY + iY - localY, heightMap[activeTile], timestampMap[activeTile]);
-					
-					M -= heightMap[activeTile];
+				
+				float crust = heightMap[activeTile];
+				if (segmentOwnerMap[activeTile] == segmentID && crust > Lithosphere.CONTINENTAL_BASE) {
+					// Remove the tile from this plate.
 					heightMap[activeTile] = 0;
+					M -= crust;
+					
+					// And add it to the other plate.
+					plate.addCrustByCollision(worldXSegment, worldYSegment, crust, timestampMap[activeTile]);					
 				}
 			}
 		}
+		//System.out.printf("Leaving aggregateCrust. Returning %f.\n", M_old - M);
 		
 		segment.Area = 0;	// Mark segment as non-existent.
 		return M_old - M;
@@ -318,11 +317,10 @@ public class Plate {
 	 * @param deformingMass Amount of mass deformed in collision.
 	 */
 	void applyFriction(float deformingMass) {
-		if (deformingMass > 0) {
+		if (M > 0) {
 			float dV = DEFORMATION_WEIGHT * deformingMass / M;
-
-			if (dV > getVelocity()) dV = getVelocity();
-			setVelocity(getVelocityX(), getVelocityY(), getVelocity() - dV);
+			dV = dV < _velocity ? dV : _velocity;
+			_velocity -= dV;
 		}
 	}
 	
@@ -340,6 +338,9 @@ public class Plate {
 	 * @param collidingMass Amount of colliding mass from source plate.
 	 */
 	void collide(Plate plate, int worldX, int worldY, float collidingMass) {
+		assert collidingMass > 0: "Impossible collision!";
+		assert M > 0: "My mass is impossible!";
+		
 		float coefficientRestitution = 0.0f;
 		
 		// Calculate the normal to the curve/line at collision point.
@@ -363,19 +364,19 @@ public class Plate {
 		
 		int plateA_X = this.getLocalX(worldX), plateA_Y = this.getLocalY(worldY);
 		int plateB_X = plate.getLocalX(worldX), plateB_Y = plate.getLocalY(worldY);
-		int plateA_Tile = this.getLocalTile(worldX, worldY);
-		int plateB_Tile = plate.getLocalTile(worldX, worldY);
 
-		float plateA_dX = plateA_X - R_x;
-		float plateA_dY = plateA_Y - R_y;
-		float plateB_dX = plateB_X - plate.R_x;
-		float plateB_dY = plateB_Y - plate.R_y;
+		float plateA_dX = (int)plateA_X - (int)R_x;
+		float plateA_dY = (int)plateA_Y - (int)R_y;
+		float plateB_dX = (int)plateB_X - (int)plate.R_x;
+		float plateB_dY = (int)plateB_Y - (int)plate.R_y;
 		float collision_X = plateA_dX - plateB_dX;
 		float collision_Y = plateA_dY - plateB_dY;
 		
 		// Scaling is required at last when impulses are added to plates!
-		float magnitude = (float)Math.sqrt(collision_X * collision_X + collision_Y * collision_Y);
-		assert(magnitude > 0);
+		float magnitude = collision_X * collision_X + collision_Y * collision_Y;
+		if (magnitude <= 0)
+			return;		// avoid division by zero
+		magnitude = (float)Math.sqrt(magnitude);
 		collision_X /= magnitude; collision_Y /= magnitude;	// normalize collision vector
 		
 		// Compute relative velocity between plates at the collision point.
@@ -385,6 +386,9 @@ public class Plate {
 		
 		if (dotProduct <= 0)
 			return;	// plates moving away from each other.
+
+		//System.out.printf("In Plate->collide, collision vector is (%f, %f), mag = %f, ",collision_X, collision_Y, magnitude);
+		//System.out.printf("left M %f, right M %f, collision M %f.\n", M, plate.M, collidingMass);
 		
 		float denominatorOfImpulse = (collision_X * collision_X + collision_Y * collision_Y) * (1.0f/M + 1.0f/collidingMass);
 		
@@ -395,7 +399,13 @@ public class Plate {
 		_dX += collision_X * J / M;
 		_dY += collision_Y * J / M;
 		plate._dX -= collision_X * J / (collidingMass + plate.M);
-		plate._dY -= collision_X * J / (collidingMass + plate.M);
+		plate._dY -= collision_Y * J / (collidingMass + plate.M);
+		
+		/*
+		System.out.printf("Applying impulse. Plate A: (%f,%f), Plate B: (%f,%f).\n",
+				collision_X * J / M, collision_Y * J / M,
+				collision_X * J / (collidingMass + plate.M), collision_Y * J / (collidingMass + plate.M));
+		*/
 	}
 	
 	/**
@@ -495,8 +505,8 @@ public class Plate {
 		int localX = getLocalX(worldX), localY = getLocalY(worldY);
 		int plateTile = getLocalTile(worldX, worldY);
 		int segmentID = segmentOwnerMap[plateTile];
-		CollisionSegment segment = collisionSegments.elementAt(segmentID);
-		
+
+		CollisionSegment segment = collisionSegments.elementAt(segmentID);				
 		return new CollisionStatistic(segment.Collisions, segment.Collisions / (1.0f + segment.Area));		
 	}
 	  
@@ -560,8 +570,10 @@ public class Plate {
 	 */
 	void move() {
 		// Plate out of bounds here.
-		assert(left >= 0 && left <= mapSize && top >= 0 && top <= mapSize);
-
+		assert(getLeft() >= 0 && getLeft() <= mapSize && getTop() >= 0 && getTop() <= mapSize);
+		int oldLeft = (int)left, oldTop = (int)top;
+		float oldVel = _velocity, oldVx = _vX, oldVy = _vY;
+		
 		_vX += _dX; _vY += _dY;
 		_dX = _dY = 0;
 		
@@ -569,18 +581,27 @@ public class Plate {
 		_vX /= len;
 		_vY /= len;
 		_velocity += len - 1.0f;
-		_velocity *= _velocity > 0 ? 1 : 0;
+		if (_velocity < 0) _velocity = 0;
 
 		left += _vX * _velocity;
-		top += top > 0 ? 0 : mapSize;
-		top -= top < mapSize ? 0 : mapSize;
-		
 		top += _vY * _velocity;
-		top += top > 0 ? 0 : mapSize;
-		top -= top < mapSize ? 0 : mapSize;
+
+		float move = (float)Math.sqrt(
+				Math.pow((oldLeft - (int)left) % mapSize, 2.0) +
+				Math.pow((oldTop - (int)top) % mapSize, 2.0));
+		float angle = (float)Math.toDegrees(Math.atan2(_vX * oldVy - _vY * oldVx, _vX * oldVx + _vY * oldVy));
+		//System.out.printf("Heading changed by %f degrees.\n", angle);
 		
-		// Plate out of bounds here.
-		assert(left >= 0 && left <= mapSize && top >= 0 && top <= mapSize);
+		left += (int)left > 0 ? 0 : mapSize;
+		left -= (int)left < mapSize ? 0 : mapSize;
+		
+		top += (int)top > 0 ? 0 : mapSize;
+		top -= (int)top < mapSize ? 0 : mapSize;
+		
+		// No sprinting plates.
+		assert move < 4 : String.format("Impossible movement! Plate moved to (%d,%d). Moved %d units.\n", (int)left, (int)top, (int)move);
+		// Plate out of bounds here. Note: This line is impossible to trigger.
+		assert left >= 0 && left < mapSize && top >= 0 && top < mapSize: "Impossible position! Plate out of bounds after moving.";
 	}
 	
 	/**
@@ -621,80 +642,100 @@ public class Plate {
 	 * @param amount Amount of material at the given location.
 	 * @param timeStamp Time of creation of new crust.
 	 */
-	void setCrust(int worldX, int worldY, float amount, int timeStamp) {
-		assert(!Float.isNaN(amount));
-		worldX %= mapSize; worldY %= mapSize;
-		//assert(worldX >= 0 && worldX < mapSize && worldY >= 0 && worldY < mapSize);
-		
-		if (amount < 0) amount = 0;	//negative mass is unlikely
-		
+	void setCrust(int worldX, int worldY, float amount, int timeStamp) {		
 		int localX = getLocalX(worldX), localY = getLocalY(worldY);
-		int plateTile = localY * width + localX;
-
-		if (localX < 0 || localX >= width || localY < 0 || localY >= height) {
-			int newWidth = width, newHeight = height;
+		int plateTile = getLocalTile(worldX, worldY);
+		
+		if (plateTile < 0 || plateTile >= width * height) {
+			assert amount > 0 : "Attempting to extend plate for nothing.";
+			
 			int bound[] = new int[] {
-				left, top, (left + width - 1) % mapSize, (top + height - 1) % mapSize
+				getLeft(), getTop(), (getLeft() + width - 1), (getTop() + height - 1)
 			};
-
+			//System.out.printf("Old bounds: [%d,%d]-[%d,%d] @ (%d,%d)\n.", bound[0], bound[1], bound[2], bound[3], width, height);
+			worldX %= mapSize;
+			worldY %= mapSize;	// just to be safe
+			
+			// Calculate distance of new point from plate edges.
 			int distTmp[] = new int[] {
-				bound[0] - worldX + (worldX>bound[0] ? mapSize : 0),	// dist from left side
-				bound[1] - worldY + (worldY>bound[1] ? mapSize : 0),	// dist from top side
-				worldX - bound[2] + (worldX<bound[2] ? mapSize : 0),	// dist from right side
-				worldY - bound[3] + (worldY<bound[3] ? mapSize : 0) 	// dist from bottom side			
+				bound[0] - worldX,
+				bound[1] - worldY,
+				worldX - bound[2] + (worldX < bound[0] ? mapSize : 0),	// dist from right side
+				worldY - bound[3] + (worldY < bound[1] ? mapSize : 0) 	// dist from bottom side			
 			};
-			int dist[] = new int[] {0, 0, 0, 0};
 			
-			if (localX < 0 || localX >= width) {
-				// Update width/left
-				dist[0] = distTmp[0] <  distTmp[2] ? distTmp[0] : 0;				// use smallest distance 
-				dist[2] = distTmp[2] <= distTmp[0] ? distTmp[2] : 0;
-				bound[0] = bound[0] - dist[0] + (dist[0] > bound[0] ? mapSize : 0);;
-				bound[2] = (bound[2] + dist[2]) % mapSize;
-				newWidth = width + dist[0] + dist[2];
-				if (newWidth < width) newWidth = width;		// This should NOT be possible.
-			}
-			if (localY < 0 || localY >= height) {
-					dist[1] = distTmp[1] <  distTmp[3] ? distTmp[1] : 0;				// use smallest distance
-				dist[3] = distTmp[3] <= distTmp[1] ? distTmp[3] : 0;
-				bound[1] = bound[1] - dist[1] + (dist[1] > bound[1] ? mapSize : 0);
-				bound[3] = (bound[3] + dist[3]) % mapSize;
-				newHeight = height + dist[1] + dist[3];
-				if (newHeight < height) newHeight = height;	// This should NOT be possible.
+			// Allow comparison of negative distances.
+			for (int i = 0; i < distTmp.length; i++)
+				distTmp[i] = distTmp[i] < 0 ? mapSize : distTmp[i];
+			
+			// Set larger of horizontal/vertical distance to zero.
+			// A valid distance is NEVER larger than world's side's length!
+			int dist[] = new int[] {
+				distTmp[0] <  distTmp[2] && distTmp[0] < mapSize ? distTmp[0] : 0,
+				distTmp[1] <  distTmp[3] && distTmp[1] < mapSize ? distTmp[1] : 0,
+				distTmp[2] <= distTmp[0] && distTmp[2] < mapSize ? distTmp[2] : 0,
+				distTmp[3] <= distTmp[1] && distTmp[3] < mapSize ? distTmp[3] : 0,
+			};
+			
+			// Bounds changes forced to be in multiples of 8
+			for (int i = 0; i < dist.length; i++) {
+				dist[i] = ((dist[i] > 0 ? 1 : 0) + (dist[i] >> 3)) << 3;
 			}
 			
-			if (newWidth != width || newHeight != height) {
-				left = bound[0]; top = bound[1];
-				
-				// Reallocate plate data storage
-				float[] newHeightmap = new float[newWidth * newHeight];
-				int[] newSegmentOwnerMap = new int[newWidth * newHeight];
-				int[] newTimestampMap = new int[newWidth * newHeight];
-				
-				// Copy existing data over
-				for (int row = 0; row < height; row++) {
-					int posDest = (int) ((dist[1] + row) * newWidth + dist[0]);
-					int posSrc = row * width;
-					
-					System.arraycopy(heightMap, posSrc, newHeightmap, posDest, width);
-					System.arraycopy(segmentOwnerMap, posSrc, newSegmentOwnerMap, posDest, width);
-					System.arraycopy(timestampMap, posSrc, newTimestampMap, posDest, width);
-				}
-				
-				// Replace the old(now invalid) storage
-				heightMap = newHeightmap;
-				segmentOwnerMap = newSegmentOwnerMap;
-				timestampMap = newTimestampMap;
-				width = newWidth; height = newHeight;
-				
-				// Shift collision segment local coordinates
-				for (CollisionSegment seg:collisionSegments) {
-					seg.X0 += dist[0];
-					seg.X1 += dist[0];
-					seg.Y0 += dist[1];
-					seg.Y1 += dist[1];
-				}
+			// Prevent plate from growing larger than container.
+			if (width + dist[0] + dist[2] > mapSize) {
+				dist[0] = 0;
+				dist[2] = mapSize - width;
 			}
+			if (height + dist[1] + dist[3] > mapSize) {
+				dist[1] = 0;
+				dist[3] = mapSize - height;
+			}
+			
+			int oldWidth = width, oldHeight = height;
+			
+			left -= dist[0];
+			left += (int)left < 0 ? mapSize : 0;
+			width += dist[0] + dist[2];
+			
+			top -= dist[1];
+			top += (int)top < 0 ? mapSize : 0;
+			height += dist[1] + dist[3];
+			
+			// Reallocate plate data storage
+			float[] newHeightmap = new float[width * height];
+			int[] newSegmentOwnerMap = new int[width * height];
+			int[] newTimestampMap = new int[width * height];
+			
+			Arrays.fill(newHeightmap, 0f);
+			Arrays.fill(newTimestampMap, 0);
+			Arrays.fill(newSegmentOwnerMap, Integer.MAX_VALUE);
+			
+			// Copy existing data over
+			for (int row = 0; row < oldHeight; row++) {
+				int posDest = (int) ((dist[1] + row) * width + dist[0]);
+				int posSrc = row * oldWidth;
+				
+				System.arraycopy(heightMap, posSrc, newHeightmap, posDest, oldWidth);
+				System.arraycopy(segmentOwnerMap, posSrc, newSegmentOwnerMap, posDest, oldWidth);
+				System.arraycopy(timestampMap, posSrc, newTimestampMap, posDest, oldWidth);
+			}
+			
+			// Replace the old(now invalid) storage
+			heightMap = newHeightmap;
+			segmentOwnerMap = newSegmentOwnerMap;
+			timestampMap = newTimestampMap;
+			
+			// Shift collision segment local coordinates
+			for (CollisionSegment seg:collisionSegments) {
+				seg.X0 += dist[0];
+				seg.X1 += dist[0];
+				seg.Y0 += dist[1];
+				seg.Y1 += dist[1];
+			}
+			
+			//System.out.printf("New bounds: [%d,%d]-[%d,%d] (%dx%d) to include (%d,%d)\n.", getLeft(), getTop(), getLeft() + width - 1, getTop() + height - 1, width, height, worldX, worldY);
+			
 			plateTile = getLocalTile(worldX, worldY);
 			assert(plateTile < heightMap.length);
 		}
@@ -734,7 +775,7 @@ public class Plate {
 			return adjSegmentID;
 				
 		segmentOwnerMap[origin_index] = newSegmentID;
-		CollisionSegment newSegment = new CollisionSegment(localX, localY, localX, localY, 1);
+		CollisionSegment newSegment = new CollisionSegment(localX, localY, localX, localY, 0);
 		
 		Stack<Integer> border = new Stack<Integer>();
 		border.Push(origin_index);
@@ -746,45 +787,30 @@ public class Plate {
 			int x = Util.getX(plateTile, width);
 			int y = Util.getY(plateTile, width);
 			
-			// in the 4 cardinal directions, clamp at border.
-			int tileN, tileS, tileW, tileE;
-			tileN = Util.getTile(x, Math.max(y - 1, 0), width, height);
-			tileS = Util.getTile(x, Math.min(y + 1, height - 1), width, height);
-			tileW = Util.getTile(Math.max(x - 1, 0), y, width, height);
-			tileE = Util.getTile(Math.min(x + 1, width - 1), y, width, height);
-			
-			// If the N/S/E/W tile is un-owned, claim it for the active segment
-			// and add it to the border.
-			if (segmentOwnerMap[tileN] > newSegmentID && heightMap[tileN] >= Lithosphere.CONTINENTAL_BASE) {
-				segmentOwnerMap[tileN] = newSegmentID;
-				border.Push(tileN);
-				newSegment.Area++;
-				newSegment.UpdateBoundsToInclude(Util.getX(tileN, width), Util.getY(tileN, width));
+			Stack<Integer> testTiles = new Stack<Integer>();
+			if (x > 0) testTiles.Push(plateTile - 1);				// can go left/west
+			if (x < width - 1) testTiles.Push(plateTile + 1);		// can go right/east
+			if (y > 0) testTiles.Push(plateTile - width);			// can go up/north
+			if (y < height - 1) testTiles.Push(plateTile + width);	// can go down/south
+			for (int tile: testTiles) {
+				// If the N/S/E/W tile is un-owned, claim it for the active segment
+				// and add it to the border.
+				if (segmentOwnerMap[tile] > newSegmentID &&
+					heightMap[tile] >= Lithosphere.CONTINENTAL_BASE) {
+					border.Push(tile);
+					newSegment.Area++;
+					newSegment.UpdateBoundsToInclude(Util.getX(tile, width), Util.getY(tile, width));
+					segmentOwnerMap[tile] = newSegmentID;
+				}
 			}
-			if (segmentOwnerMap[tileS] > newSegmentID && heightMap[tileS] >= Lithosphere.CONTINENTAL_BASE) {
-				segmentOwnerMap[tileS] = newSegmentID;
-				border.Push(tileS);
-				newSegment.Area++;
-				newSegment.UpdateBoundsToInclude(Util.getX(tileS, width), Util.getY(tileS, width));
-			}
-			if (segmentOwnerMap[tileW] > newSegmentID && heightMap[tileW] >= Lithosphere.CONTINENTAL_BASE) {
-				segmentOwnerMap[tileW] = newSegmentID;
-				border.Push(tileW);
-				newSegment.Area++;
-				newSegment.UpdateBoundsToInclude(Util.getX(tileW, width), Util.getY(tileW, width));
-			}
-			if (segmentOwnerMap[tileE] > newSegmentID && heightMap[tileE] >= Lithosphere.CONTINENTAL_BASE) {
-				segmentOwnerMap[tileE] = newSegmentID;
-				border.Push(tileE);
-				newSegment.Area++;
-				newSegment.UpdateBoundsToInclude(Util.getX(tileE, width), Util.getY(tileE, width));
-			}
-			
 			// Overwrite processed point in border with last item from border
 			border.set(borderIndex, border.Peek());
-			border.Pop();
+			border.Pop();			
 		}
-		System.out.printf("New segment created, [%d,%d]-[%d,%d](%dx%d) @ (%d,%d).\n",
+		
+		if (false && newSegment.Area > 0)
+			System.out.printf("New segment created, ID %d. [%d,%d]-[%d,%d](%dx%d) @ (%d,%d).\n",
+				newSegmentID,
 				newSegment.X0, newSegment.Y0, newSegment.X1, newSegment.Y1, newSegment.getW(), newSegment.getH(), localX, localY);
 		
 		collisionSegments.addElement(newSegment);		
@@ -838,13 +864,13 @@ public class Plate {
 	}
 	public int getLocalX(int worldX) {
 		worldX %= mapSize;                    // scale within map dimensions
-		if (worldX < left) worldX += mapSize; // wrap around world edge if necessary
-		return worldX - left;
+		if (worldX < (int)left) worldX += mapSize; // wrap around world edge if necessary
+		return worldX - getLeft();
 	}
 	public int getLocalY(int worldY) {
 		worldY %= mapSize;                    // scale within map dimensions
-		if (worldY < top) worldY += mapSize;  // wrap around world edge if necessary
-		return worldY - top;
+		if (worldY < (int)top) worldY += mapSize;  // wrap around world edge if necessary
+		return worldY - getTop();
 	}
 	private boolean worldTileIsOnPlate(int worldX, int worldY) {
 		int localX = getLocalX(worldX), localY = getLocalY(worldY);

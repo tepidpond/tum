@@ -18,7 +18,7 @@ public class Lithosphere {
 	private static final int MAX_BUOYANCY_AGE = 20;
 	
 	private float worldMap[];  // denotes height of terrain of tiles
-	private float worldPlates[];   // denotes plate ownership of tiles. Is a float because of saveHeightmap.
+	private int worldPlates[];   // denotes plate ownership of tiles.
 	private Plate plates[];
 	private Stack<CollisionDetails> subductions[];
 	private Stack<CollisionDetails> collisions[];
@@ -79,7 +79,7 @@ public class Lithosphere {
 		separateLandAndSea(tmpWorldMap, seaLevel);
 		
 		this.worldMap = new float[(int)Math.pow(mapSize, 2)];
-		this.worldPlates = new float[(int)Math.pow(mapSize, 2)];
+		this.worldPlates = new int[(int)Math.pow(mapSize, 2)];
 		Arrays.fill(worldPlates, numPlates);
 		
 		for (int i = 0; i < mapSize; i++)
@@ -96,12 +96,12 @@ public class Lithosphere {
 	public boolean Update() {
 		if (checkForStaticWorld()) return false;
 
-		//Util.saveHeightmap(indexMap, mapSize, "p" + Integer.toString(generations));
-		Util.saveHeightmap(worldMap, worldSize, "t" + Integer.toString(generations));
+		//Util.saveIntmap(worldPlates, worldSize, worldSize, "p" + Integer.toString(generations));
+		Util.displayHeightmap(worldMap, worldSize, worldSize, "t" + Integer.toString(generations));
 		
 		moveAndErodePlates();
 		int continentalCollisions = 0;
-		float worldPlatesOld[] = new float[worldPlates.length];
+		int worldPlatesOld[] = new int[worldPlates.length];
 		System.arraycopy(worldPlates, 0, worldPlatesOld, 0, worldPlates.length);
 		Arrays.fill(worldMap, 0);
 		Arrays.fill(worldPlates, Integer.MAX_VALUE);
@@ -241,7 +241,7 @@ public class Lithosphere {
 		int prev_area = plates[(int) worldPlates[worldTile]].addCollision(worldX, worldY);
 		
 		if (this_area < prev_area) {
-			CollisionDetails cd = new CollisionDetails((int) worldPlates[worldTile], worldX, worldY, plateMap[plateTile] * foldingRatio);
+			CollisionDetails cd = new CollisionDetails(worldPlates[worldTile], worldX, worldY, plateMap[plateTile] * foldingRatio);
 
 				// Give some...
 			worldMap[worldTile] += cd.getCrust();
@@ -292,15 +292,16 @@ public class Lithosphere {
 				float collisionRatio = Math.max(csPlateA.CollidedRatio, csPlateB.CollidedRatio);
 				
 				if ((collisionCount > aggr_ratio_abs) | (collisionRatio > aggr_ratio_rel)) {
-					plates[cd.getIndex()].collide(plates[activePlate], cd.getX(), cd.getY(), 
-						plates[activePlate].aggregateCrust(plates[cd.getIndex()], cd.getX(), cd.getY()));
+					float amount = plates[activePlate].aggregateCrust(plates[cd.getIndex()], cd.getX(), cd.getY());
+					if (amount > 0)	// zero indicates already collided because segment has been cleared.
+						plates[cd.getIndex()].collide(plates[activePlate], cd.getX(), cd.getY(), amount);
 				}
 			}
 			collisions[activePlate].clear();
 		}
 	}
 	
-	private void regenerateCrust(float[] worldPlatesOld, int[] worldAgeMap) {
+	private void regenerateCrust(int[] worldPlatesOld, int[] worldAgeMap) {
 		if (REGENERATE_CRUST) {
 			for (int y = 0; y < worldSize; y++) {
 				for (int x = 0; x < worldSize; x++) {
@@ -324,11 +325,11 @@ public class Lithosphere {
 	private void addSeaFloorUplift(int[] worldAgeMap) {
 		if (BUOYANCY_BONUS > 0) {
 			for (int worldTile = 0; worldTile < worldMap.length; worldTile++) {
-				int crustAge = (generations - worldAgeMap[worldTile]);
 				// If it has been not more than MAX_BUOYANCY_AGE generations since the sea floor
 				// was created from magma, increase the height by a decreasing amount.
-				if (worldMap[worldTile] < CONTINENTAL_BASE && crustAge <= MAX_BUOYANCY_AGE)
-					worldMap[worldTile] += crustAge * BUOYANCY_BONUS * OCEANIC_BASE * (1.0f / MAX_BUOYANCY_AGE); 
+				float buoyancyRatio = (MAX_BUOYANCY_AGE - (generations - worldAgeMap[worldTile])) / (float)MAX_BUOYANCY_AGE;
+				if (buoyancyRatio > 0 && worldMap[worldTile] < CONTINENTAL_BASE)
+					worldMap[worldTile] += buoyancyRatio * BUOYANCY_BONUS * OCEANIC_BASE; 
 			}
 		}
 	}
