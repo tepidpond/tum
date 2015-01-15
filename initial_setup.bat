@@ -1,4 +1,4 @@
-rem @echo off
+@echo off
 PATH=%PATH%;"C:\Program Files (x86)\Git\bin"
 cd eclipse\.metadata\.plugins
 git update-index --assume-unchanged org.eclipse.core.resources/.projects/Minecraft/.location
@@ -14,5 +14,4 @@ git update-index --assume-unchanged org.eclipse.debug.core/.launches/Client.laun
 git update-index --assume-unchanged org.eclipse.debug.core/.launches/Server.launch
 git update-index --assume-unchanged org.eclipse.debug.ui/launchConfigurationHistory.xml
 cd ..\..\..
-gradlew.bat setupDecompWorkspace
-gradlew.bat eclipse
+gradlew.bat setupDecompWorkspace eclipse
