@@ -96,7 +96,6 @@ public class Lithosphere {
 	public boolean Update() {
 		if (checkForStaticWorld()) return false;
 
-		//Util.saveIntmap(worldPlates, worldSize, worldSize, "p" + Integer.toString(generations));
 		Util.displayHeightmap(worldMap, worldSize, worldSize, "t" + Integer.toString(generations));
 		
 		moveAndErodePlates();
@@ -220,14 +219,13 @@ public class Lithosphere {
 			subductions[(int) worldPlates[worldTile]].Push(
 					new CollisionDetails(activePlate, worldX, worldY, sediment));
 
-			plates[activePlate].setCrust(worldX, worldY, worldMap[worldTile] - OCEANIC_BASE, this_timestamp);
+			plates[activePlate].setCrust(worldX, worldY, worldMap[worldTile] - OCEANIC_BASE, prev_timestamp);
 
 			worldMap[worldTile] -= OCEANIC_BASE;
 
 			if (worldMap[worldTile] <= 0)
 			{
 				worldPlates[worldTile] = activePlate;
-				assert(!Float.isNaN(plateMap[plateTile]));
 				worldMap[worldTile] = plateMap[plateTile];
 				ageMap[worldTile] = plateAge[plateTile];
 
