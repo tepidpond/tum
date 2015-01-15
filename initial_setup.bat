@@ -1,4 +1,4 @@
-rem @echo off
+@echo off
 PATH=%PATH%;"C:\Program Files (x86)\Git\bin"
 cd eclipse\.metadata\.plugins
 git update-index --assume-unchanged org.eclipse.core.resources/.projects/Minecraft/.location
