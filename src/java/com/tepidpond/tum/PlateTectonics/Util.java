@@ -10,6 +10,7 @@ import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.WindowConstants;
 
 public class Util {
 	public static class ImageViewer {
@@ -23,6 +24,7 @@ public class Util {
 			frame.getContentPane().add(label, BorderLayout.CENTER);
 			frame.pack();
 			frame.setLocationRelativeTo(null);
+			frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 			Hide();
 		}
 		public static void DisplayImage(BufferedImage bi) {
@@ -87,17 +89,39 @@ public class Util {
 		float hm[] = heightMap; //normalizeHeightMapCopy(heightMap);
 		BufferedImage bi = new BufferedImage(mapWidth, mapHeight, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D g = bi.createGraphics();
+		float COLOR_STEP = 1.5f;
 		for (int x=0; x<mapWidth; x++) {
 			for (int y=0; y<mapHeight; y++) {
 				float h = hm[getTile(x, y, mapWidth, mapHeight)];
-				if (h<0.0)
-					g.setColor(new Color(1.0f, 0.0f, 0.0f));
+				if (h < 2 * FLT_EPSILON)
+					g.setColor(new Color(1, 0, 0));
 				else if (h < 0.5)
-					g.setColor(new Color(h, h, h / 2f));
-				else if (h <= 1.0f)
-					g.setColor(new Color(h, h, h));
-				else
-					g.setColor(new Color(1.0f, 1.0f, 1.0f));
+					g.setColor(new Color(0.0f, 0.0f, 0.25f + 1.5f * h));
+				else if (h < 1.0)
+					g.setColor(new Color(0, 2 * (h - 0.5f), 1.0f));
+				else {
+					h -= 1.0;
+					if (h < COLOR_STEP)
+						g.setColor(new Color(0f, 0.5f + 0.5f * h / COLOR_STEP, 0f));
+					else if (h < 1.5 * COLOR_STEP)
+						g.setColor(new Color(2f * (h - COLOR_STEP) / COLOR_STEP, 1.0f, 0));
+					else if (h < 2.0 * COLOR_STEP)
+						g.setColor(new Color(1.0f, 1.0f - (h - 1.5f * COLOR_STEP) / COLOR_STEP, 0));
+					else if (h < 3.0 * COLOR_STEP)
+						g.setColor(new Color(1.0f - 0.5f * (h - 2.0f * COLOR_STEP) / COLOR_STEP, 0.5f - 0.25f * (h - 2.0f * COLOR_STEP) / COLOR_STEP, 0));
+					else if (h < 5.0 * COLOR_STEP)
+						g.setColor(new Color(
+								0.5f - 0.125f * (h - 3.0f * COLOR_STEP) / (2f * COLOR_STEP),
+								0.25f + 0.125f * (h - 3.0f * COLOR_STEP) / (2f * COLOR_STEP),
+								0.375f * (h - 3.0f * COLOR_STEP) / (2f * COLOR_STEP)));
+					else if (h < 8.0 * COLOR_STEP)
+						g.setColor(new Color(
+								0.375f + 0.625f * (h - 5.0f * COLOR_STEP) / (3f * COLOR_STEP),
+								0.375f + 0.625f * (h - 5.0f * COLOR_STEP) / (3f * COLOR_STEP),
+								0.375f + 0.625f * (h - 5.0f * COLOR_STEP) / (3f * COLOR_STEP)));
+					else
+						g.setColor(new Color(1, 1, 1));
+				}
 				g.drawLine(x, y, x, y);
 			}
 		}
