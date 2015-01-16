@@ -259,7 +259,7 @@ public class Lithosphere {
 			// Give the location to the larger plate.
 			assert(!Float.isNaN(plateMap[plateTile]));
 			worldMap[worldTile] = plateMap[plateTile];
-			worldMap[worldTile] = activePlate;
+			worldPlates[worldTile] = activePlate;
 			ageMap[worldTile] = plateAge[plateTile];
 		}
 		return 1;
