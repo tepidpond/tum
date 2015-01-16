@@ -187,8 +187,8 @@ public class Lithosphere {
 
 		int prev_timestamp = plates[(int) worldPlates[worldTile]].getCrustTimestamp(worldX, worldY);
 		int this_timestamp = plateAge[plateTile];
-		boolean prev_is_bouyant = (worldMap[worldTile] > plateMap[plateTile]) |
-			(Math.abs(worldMap[worldTile] - plateMap[plateTile]) < 2 * Util.FLT_EPSILON &
+		boolean prev_is_bouyant = (worldMap[worldTile] > plateMap[plateTile]) ||
+			(Math.abs(worldMap[worldTile] - plateMap[plateTile]) < 2 * Util.FLT_EPSILON &&
 			 prev_timestamp >= this_timestamp);
 
 		// Handle subduction of oceanic crust as special case.
@@ -201,7 +201,7 @@ public class Lithosphere {
 			float sediment = OCEANIC_BASE * (CONTINENTAL_BASE - plateMap[plateTile]) / CONTINENTAL_BASE;
 
 			// Save collision to the receiving plate's list.
-			subductions[(int) worldPlates[worldTile]].Push(
+			subductions[worldPlates[worldTile]].Push(
 					new CollisionDetails(activePlate, worldX, worldY, sediment));
 
 			// Remove subducted oceanic lithosphere from plate.
@@ -216,11 +216,10 @@ public class Lithosphere {
 		} else if (prev_is_oceanic) {
 			float sediment = OCEANIC_BASE * (CONTINENTAL_BASE - worldMap[worldTile]) / CONTINENTAL_BASE;
 
-			subductions[(int) worldPlates[worldTile]].Push(
-					new CollisionDetails(activePlate, worldX, worldY, sediment));
+			subductions[activePlate].Push(
+					new CollisionDetails(worldPlates[worldTile], worldX, worldY, sediment));
 
-			plates[activePlate].setCrust(worldX, worldY, worldMap[worldTile] - OCEANIC_BASE, prev_timestamp);
-
+			plates[worldPlates[worldTile]].setCrust(worldX, worldY, worldMap[worldTile] - OCEANIC_BASE, prev_timestamp);
 			worldMap[worldTile] -= OCEANIC_BASE;
 
 			if (worldMap[worldTile] <= 0)
@@ -272,7 +271,7 @@ public class Lithosphere {
 			for (CollisionDetails cd: subductions[activePlate]) {
 				plates[activePlate].addCrustBySubduction(
 					cd.getX(), cd.getY(), cd.getCrust(), generations,
-					plates[cd.getIndex()].getVelocityX(), plates[cd.getIndex()].getVelocityY());
+					plates[cd.getIndex()].vX, plates[cd.getIndex()].vY);
 			}
 			subductions[activePlate].clear();
 		}
