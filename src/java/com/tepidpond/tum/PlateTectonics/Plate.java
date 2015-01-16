@@ -32,57 +32,19 @@ public class Plate {
 	// Center of mass of the plate in world coordinates
 	private float R_x, R_y;
 	// Components of plate's velocity. vX and vY are components of a unit vector, velocity is the magnitude
-	private float _velocity, _vX, _vY;
+	float Velocity, vX, vY;
 	// Components of plate's acceleration
-	private float _acceleration, _dX, _dY;
+	private float dX, dY;
 	
 	// Used for random off-setting in subduction routine and setting up initial direction
 	private Random rand;
 	
-	float getMomentum()  {return M * getVelocity();}
+	float getMomentum()  {return M * Velocity;}
 	int  getLeft()       {return (int)left;}
 	int getTop()         {return (int)top;}
 	int getHeight()      {return height;}
 	int getWidth()       {return width;}
 	Boolean isEmpty()    {return M<=0;} 
-
-	public float getVelocityX() { return _vX;}
-	public float getVelocityY() { return _vY;}
-	public float getVelocity() { return _velocity;}
-	private void setVelocity(float vX, float vY, float magnitude) {
-		assert(!Float.isNaN(vX)); assert(!Float.isNaN(vY)); assert(!Float.isNaN(magnitude));
-
-		float normFactor = (float) Math.sqrt(Math.pow(vX, 2.0) + Math.pow(vY, 2.0));
-		if (normFactor > 0) {
-			_vX = (float) (vX / normFactor);
-			_vY = (float) (vY / normFactor);
-			_velocity = magnitude * normFactor;
-		} else {
-			_vX = _vY = _velocity = 0;
-		}
-	}
-	private float getImpulseX() { return _dY;}
-	private float getImpulseY() { return _dX;}
-	private float getImpulse() { return _acceleration;}
-	private void setImpulse(float dX, float dY, float magnitude) {
-		_dX = _dY = _acceleration = 0;
-		addImpulse(dX, dY, magnitude);
-	}
-	private void addImpulse(float dX, float dY, float magnitude) {
-		assert(!Float.isNaN(dX)); assert(!Float.isNaN(dY)); assert(!Float.isNaN(magnitude));
-		
-		dX *= dX > 0 ? 1 : 0;	// scale zero/negative velocity to zero.
-		dY *= dY > 0 ? 1 : 0;
-		magnitude *= magnitude > 0 ? 1 : 0;
-		
-		float normFactor = (float) Math.sqrt(Math.pow(dX, 2.0) + Math.pow(dY, 2.0));
-		assert(!Float.isNaN(normFactor));
-		if (normFactor > 0) {
-			_dX += (float) (dX / normFactor);
-			_dY += (float) (dY / normFactor);
-		}
-		_acceleration += magnitude * normFactor;
-	}
 	
 	public Plate(float[] plateData, int plateMapWidth, int xOrigin, int yOrigin, int plateAge, int mapSize, Random rand) {
 		if (plateData.length < 1) return;
@@ -96,7 +58,7 @@ public class Plate {
 		this.rand = rand;
 		R_x = 0;
 		R_y = 0;
-		setImpulse(0, 0, 0);
+		dX = dY = 0;
 		
 		int area = width * height;
 		double angle = 2 * Math.PI * rand.nextDouble();
@@ -107,9 +69,9 @@ public class Plate {
 		this.segmentOwnerMap = new int[area];
 		
 		// Establish initial velocity and direction.
-		_vX = (float)Math.cos(angle) * INITIAL_SPEED;
-		_vY = (float)Math.sin(angle) * INITIAL_SPEED;
-		_velocity = 1.0f;
+		vX = (float)Math.cos(angle) * INITIAL_SPEED;
+		vY = (float)Math.sin(angle) * INITIAL_SPEED;
+		Velocity = 1.0f;
 		
 		// Intended for random circular motion of plate. Unused.
 		//this.alpha = -rand.nextInt(1) * Math.PI * 0.01 * rand.nextFloat();
@@ -134,8 +96,6 @@ public class Plate {
 				// had been moving to its current direction until all
 				// plate's (oceanic) crust receives an age.
 				this.timestampMap[tileIndex] = plateData[tileIndex] > 0 ? plateAge : 0;
-				
-				assert(!Float.isNaN(heightMap[tileIndex]));
 			}
 		}
 		
@@ -209,10 +169,10 @@ public class Plate {
 
 		int localX = getLocalX(worldX), localY = getLocalY(worldY);
 		
-		float dotProduct = _vX * dX + _vY * dY;
+		float dotProduct = vX * dX + vY * dY;
 		if (dotProduct > 0) {
-			dX -= _vX;
-			dY -= _vY;
+			dX -= vX;
+			dY -= vY;
 		}
 		
 		// o = +- 3 * R^3
@@ -323,8 +283,8 @@ public class Plate {
 		if (M > 0) {
 			float dV = DEFORMATION_WEIGHT * deformedMass / M;
 			
-			_velocity -= dV;
-			if (_velocity < 0) _velocity = 0; 
+			Velocity -= dV;
+			if (Velocity < 0) Velocity = 0; 
 		}
 	}
 	
@@ -342,6 +302,8 @@ public class Plate {
 	 * @param collidingMass Amount of colliding mass from source plate.
 	 */
 	void collide(Plate plate, int worldX, int worldY, float collidingMass) {
+		if (M <= 0 || collidingMass <= 0) return;	// don't collide if there's nothing to collide with
+		
 		float coefficientRestitution = 0.0f;
 		
 		// Calculate the normal to the curve/line at collision point.
@@ -384,7 +346,7 @@ public class Plate {
 		
 		// Compute relative velocity between plates at the collision point.
 		// Because torque is not included, calc simplifies to v_ab = v_a - v_b.
-		float relVX = _vX - plate._vX, relVY = _vY - plate._vY;	// find relative velocity vector
+		float relVX = vX - plate.vX, relVY = vY - plate.vY;	// find relative velocity vector
 		float dotProduct = relVX * normalX + relVY * normalY;
 		
 		if (dotProduct <= 0) {
@@ -400,10 +362,10 @@ public class Plate {
 		float J = -(1 + coefficientRestitution) * dotProduct / denominatorOfImpulse;
 		
 		// Finally apply an acceleration;
-		_dX += normalX * J / M;
-		_dY += normalY * J / M;
-		plate._dX -= normalX * J / (collidingMass + plate.M);
-		plate._dY -= normalY * J / (collidingMass + plate.M);
+		dX += normalX * J / M;
+		dY += normalY * J / M;
+		plate.dX -= normalX * J / (collidingMass + plate.M);
+		plate.dY -= normalY * J / (collidingMass + plate.M);
 	}
 	
 	/**
@@ -572,30 +534,30 @@ public class Plate {
 	 */
 	void move() {
 		// Apply any new impulses to the plate's trajectory.
-		_vX += _dX; _vY += _dY;
-		_dX = _dY = 0;
-		
+		vX += dX; vY += dY;
+		dX = dY = 0;
+
 		// Force direction of plate to be unit vector.
 		// Update velocity so that the distance of movement doesn't change.
-		float len = (float)Math.sqrt(_vX * _vX + _vY * _vY);
-		_vX /= len;
-		_vY /= len;
-		_velocity += len - 1.0f;
-		if (_velocity < 0) _velocity = 0;	// Round negative values to zero.
+		float len = (float)Math.sqrt(vX * vX + vY * vY);
+		vX /= len;
+		vY /= len;
+		Velocity += len - 1.0f;
+		if (Velocity < 0) Velocity = 0;	// Round negative values to zero.
 
 		assert left >= 0 && left < mapSize && top >= 0 && top < mapSize: "Location coordinates out of world map bounds (PRE)!";
 		
-		left += _vX * _velocity;
+		left += vX * Velocity;
 		if (left < 0) left += mapSize;
 		if (left > mapSize) left -= mapSize;
 		
-		top += _vY * _velocity;
+		top += vY * Velocity;
 		if (top < 0) top += mapSize;
 		if (top > mapSize) top -= mapSize;
 
 		assert left >= 0 && left < mapSize && top >= 0 && top < mapSize:
-			String.format("Location coordinates out of world map bounds (POST)!\n%f, %f, %f, %f; %f, %f\n",
-					_vX, _vY, _velocity, left, top);
+			String.format("Location coordinates out of world map bounds (POST)!\n%f, %f, %f; %f, %f\n",
+					vX, vY, Velocity, left, top);
 	}
 	
 	/**

@@ -160,7 +160,7 @@ public class Lithosphere {
 		float totalKineticEnergy = 0;
 		
 		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
-			totalVelocity += plates[activePlate].getVelocity();
+			totalVelocity += plates[activePlate].Velocity;
 			totalKineticEnergy += plates[activePlate].getMomentum();
 		}
 		if (totalKineticEnergy > peakKineticEnergy)
