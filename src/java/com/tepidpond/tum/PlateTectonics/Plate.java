@@ -302,9 +302,7 @@ public class Plate {
 	 * @param worldY Y coordinate of collision point on world map.
 	 * @param collidingMass Amount of colliding mass from source plate.
 	 */
-	void collide(Plate plate, int worldX, int worldY, float collidingMass) {
-		if (M <= 0 || collidingMass <= 0) return;	// don't collide if there's nothing to collide with
-		
+	void collide(Plate plate, int worldX, int worldY, float collidingMass) {		
 		float coefficientRestitution = 0.0f;
 		
 		// Calculate the normal to the curve/line at collision point.
@@ -357,16 +355,23 @@ public class Plate {
 
 		// Calculate the denominator of impulse: n . n * (1 / m_1 + 1 / m_2).
 		// Use the mass of the colliding crust for the "donator" plate.
-		float denominatorOfImpulse = (normalX * normalX + normalY * normalY) * (1.0f/M + 1.0f/collidingMass);
+		// Somewhat arbitrarily use limits instead of allowing the NaN virus to
+		// propagate. More defensive than actually necessary.
+		float denominatorOfImpulse = (normalX * normalX + normalY * normalY) * 
+				((M == 0 ? 0 : 1.0f / M) + (collidingMass == 0 ? 0 : 1.0f / collidingMass));
 		
 		// force of impulse
 		float J = -(1 + coefficientRestitution) * dotProduct / denominatorOfImpulse;
 		
 		// Finally apply an acceleration;
-		dX += normalX * J / M;
-		dY += normalY * J / M;
-		plate.dX -= normalX * J / (collidingMass + plate.M);
-		plate.dY -= normalY * J / (collidingMass + plate.M);
+		if (M > 0) {
+				dX += normalX * J / M;
+				dY += normalY * J / M;
+		}
+		if (plate.M > 0) {
+			plate.dX -= normalX * J / (collidingMass + plate.M);
+			plate.dY -= normalY * J / (collidingMass + plate.M);
+		}
 	}
 	
 	/**
