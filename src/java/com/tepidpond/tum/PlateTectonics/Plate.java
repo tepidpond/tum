@@ -1,6 +1,7 @@
 package com.tepidpond.tum.PlateTectonics;
 
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Random;
 import java.util.Vector;
 
@@ -376,77 +377,86 @@ public class Plate {
 	 * @param lowerBound Sets limit below which there's no erosion. (Is this height limit? Mass?)
 	 */
 	void erode(float lowerBound) {
-		float newHeightmap[] = new float[width * height];
-		Arrays.fill(newHeightmap, 0);
+		float tmp[] = new float[width * height];
+		Arrays.fill(tmp, 0);
 		M = R_x = R_y = 0;
 		
 		for (int y = 0; y < height; y++) {
 			for (int x = 0; x < width; x++) {
-				int plateTile = y * width + x;
-				M += heightMap[plateTile];
-				assert(!Float.isNaN(heightMap[plateTile]));
-				newHeightmap[plateTile] += heightMap[plateTile];
+				int tile = y * width + x;
+				M += heightMap[tile];
+				tmp[tile] += heightMap[tile];
 				
 				// Update R (center of mass)
-				R_x += x * heightMap[plateTile];
-				R_y += y * heightMap[plateTile];
-				if (heightMap[plateTile] < lowerBound)
+				R_x += x * heightMap[tile];
+				R_y += y * heightMap[tile];
+				if (heightMap[tile] < lowerBound)
 					continue;	// eroded too far already, no more
 				
-				int plateTileN = Math.max(0, (y - 1)) * width + x;
-				int plateTileS = Math.min(height - 1, (y + 1)) * width + x;
-				int plateTileW = y * width + Math.max(0, x - 1);
-				int plateTileE = y * width + Math.min(width - 1, x + 1);
+				// Collect tiles in the 4 cardinal directions with wrapping
+				// when the plate is world-sized.
+				Stack<Integer> tiles = new Stack<Integer>();
+				if (width == mapSize || x > 0)			// can go west
+					tiles.Push(y * width + (x + mapSize - 1) % mapSize);
+				if (width == mapSize || x < width - 1)	// can go east
+					tiles.Push(y * width + (x + 1) % mapSize);
+				if (height == mapSize || y > 0)			// can go north
+					tiles.Push(((y + mapSize - 1) % mapSize) * width + x);
+				if (height == mapSize || y < height - 1)// can go south
+					tiles.Push(((y + 1) % mapSize) * width + x);
 				
-				float heightN = 0, heightS = 0, heightW = 0, heightE = 0;
-				if (y > 0)          heightN = heightMap[plateTileN];
-				if (y < height - 1) heightS = heightMap[plateTileS];
-				if (x > 0)          heightW = heightMap[plateTileW];
-				if (x < width - 1)  heightE = heightMap[plateTileE];
-				if (heightN + heightS + heightW + heightE == 0)
-					continue;	// no neighbors
+				// Exclude tiles not part of the plate or taller than
+				// the tile currently eroding.
+				for (Iterator<Integer> iter = tiles.iterator(); iter.hasNext(); ) {
+					int t = iter.next();
+					if (heightMap[t] <= 0 || heightMap[t] > heightMap[tile])
+						iter.remove();
+				}
 				
-				float diffN = heightMap[plateTile] - heightN;
-				float diffS = heightMap[plateTile] - heightS;
-				float diffW = heightMap[plateTile] - heightW;
-				float diffE = heightMap[plateTile] - heightE;
-				float minDiff = Math.min(Math.min(diffN, diffS), Math.min(diffW, diffE));
-				float diffSum = (heightN > 0 ? (diffN - minDiff) : 0.0f) + 
-								(heightS > 0 ? (diffS - minDiff) : 0.0f) + 
-								(heightW > 0 ? (diffW - minDiff) : 0.0f) + 
-								(heightE > 0 ? (diffE - minDiff) : 0.0f);
+				// No tiles remain, either this tile has no neighbors or it is
+				// the lowest part of its area.
+				if (tiles.isEmpty())
+					continue;
 				
-				if (diffSum > 0) {
-					if (diffSum < minDiff) {
-						newHeightmap[plateTileN] += (heightN > 0)?(diffN - minDiff):0;
-						newHeightmap[plateTileS] += (heightS > 0)?(diffS - minDiff):0;
-						newHeightmap[plateTileW] += (heightW > 0)?(diffW - minDiff):0;
-						newHeightmap[plateTileE] += (heightE > 0)?(diffE - minDiff):0;
-						newHeightmap[plateTile] -= diffSum;
-						minDiff -= diffSum;
-						minDiff /= 1 + (heightN > 0?1:0) + (heightS > 0?1:0) +
-						               (heightW > 0?1:0) + (heightE > 0?1:0);
-						assert(!Float.isNaN(minDiff));
-						
-						newHeightmap[plateTileN] += (heightN > 0)?(minDiff):0;
-						newHeightmap[plateTileS] += (heightS > 0)?(minDiff):0;
-						newHeightmap[plateTileW] += (heightW > 0)?(minDiff):0;
-						newHeightmap[plateTileE] += (heightE > 0)?(minDiff):0;
-					} else {
-						// Remove the erodable crust from the tile
-						newHeightmap[plateTile] -= minDiff;
-						float crustToShare = minDiff / diffSum;
-						// And spread it over the four neighbors.
-						newHeightmap[plateTileN] += crustToShare * (heightN > 0?diffN - minDiff:0);
-						newHeightmap[plateTileS] += crustToShare * (heightS > 0?diffS - minDiff:0);
-						newHeightmap[plateTileW] += crustToShare * (heightW > 0?diffW - minDiff:0);
-						newHeightmap[plateTileE] += crustToShare * (heightE > 0?diffE - minDiff:0);
+				// Find diff
+				float minDiff = heightMap[tile];
+				for (int t: tiles) {
+					minDiff = Math.min(minDiff, heightMap[tile] - heightMap[t]);
+				}
+				float diffSum = 0;
+				for (int t: tiles) {
+					diffSum += heightMap[tile] - heightMap[t] - minDiff;
+				}
+				
+				if (diffSum < minDiff) {
+					// There's too much crust to erode nicely. So first
+					// make all lower neighbors and this point equally
+					// tall
+					for (int t: tiles) {
+						tmp[t] += heightMap[tile] - heightMap[t] - minDiff;
+					}
+					tmp[tile] -= minDiff;
+					minDiff -= diffSum;
+					minDiff /= 1 + tiles.size();
+					// and then spread what's left equally among the lower
+					// neighbors
+					for (int t: tiles) {
+						tmp[t] += minDiff;
+					}
+				} else if (diffSum > 0) {
+					// Remove all crust from this location and make it as
+					// tall as its tallest lower neighbor
+					tmp[tile] -= minDiff;
+					float unit = minDiff / diffSum;
+					// and spread it evenly among all other lower neighbors
+					for (int t: tiles) {
+						tmp[t] += unit * (heightMap[tile] - heightMap[t] - minDiff);
 					}
 				}
 			}
 		}
 		// Save new eroded heights
-		heightMap = newHeightmap;
+		heightMap = tmp;
 		// Normalize center of mass
 		if (M > 0) {
 			R_x /= M;
