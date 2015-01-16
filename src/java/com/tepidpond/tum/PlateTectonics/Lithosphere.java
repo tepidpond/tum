@@ -369,30 +369,20 @@ public class Lithosphere {
 				int x = Util.getX(worldTile, worldSize);
 				int y = Util.getY(worldTile, worldSize);
 				
-				// in the 4 cardinal directions, clamp at border.
-				int tileN, tileS, tileW, tileE;
-				tileN = Util.getTile(x, Math.max(y - 1, 0), worldSize);
-				tileS = Util.getTile(x, Math.min(y + 1, worldSize - 1), worldSize);
-				tileW = Util.getTile(Math.max(x - 1, 0), y, worldSize);
-				tileE = Util.getTile(Math.min(x + 1, worldSize - 1), y, worldSize);
+				// in the 4 cardinal directions, allow wrapping.
+				Stack<Integer> tiles = new Stack<Integer>();
+				tiles.Push(Util.getTile(x, (y + worldSize - 1) % worldSize, worldSize));
+				tiles.Push(Util.getTile(x, (y + 1) % worldSize, worldSize));
+				tiles.Push(Util.getTile((x + worldSize - 1) % worldSize, y, worldSize));
+				tiles.Push(Util.getTile((x + 1) % worldSize, y, worldSize));
 				
 				// If the N/S/E/W tile is un-owned, claim it for the active plate
 				// and add it to that plate's border.
-				if (worldPlates[tileN] >= numPlates) {
-					worldPlates[tileN] = activePlate;
-					plates[activePlate].pushBorder(tileN);
-				}
-				if (worldPlates[tileS] >= numPlates) {
-					worldPlates[tileS] = activePlate;
-					plates[activePlate].pushBorder(tileS);
-				}
-				if (worldPlates[tileW] >= numPlates) {
-					worldPlates[tileW] = activePlate;
-					plates[activePlate].pushBorder(tileW);
-				}
-				if (worldPlates[tileE] >= numPlates) {
-					worldPlates[tileE] = activePlate;
-					plates[activePlate].pushBorder(tileE);
+				for (int tile: tiles) {
+					if (worldPlates[tile] >= numPlates) {
+						worldPlates[tile] = activePlate;
+						plates[activePlate].pushBorder(tile);
+					}
 				}
 				
 				// Overwrite processed point in border with last item from border

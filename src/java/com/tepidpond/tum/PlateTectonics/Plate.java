@@ -757,12 +757,17 @@ public class Plate {
 			int x = Util.getX(plateTile, width);
 			int y = Util.getY(plateTile, width);
 			
-			Stack<Integer> testTiles = new Stack<Integer>();
-			if (x > 0) testTiles.Push(plateTile - 1);				// can go left/west
-			if (x < width - 1) testTiles.Push(plateTile + 1);		// can go right/east
-			if (y > 0) testTiles.Push(plateTile - width);			// can go up/north
-			if (y < height - 1) testTiles.Push(plateTile + width);	// can go down/south
-			for (int tile: testTiles) {
+			Stack<Integer> tiles = new Stack<Integer>();
+			if (width == mapSize || x > 0)			// can go west
+				tiles.Push(y * width + (x + mapSize - 1) % mapSize);
+			if (width == mapSize || x < width - 1)	// can go east
+				tiles.Push(y * width + (x + 1) % mapSize);
+			if (height == mapSize || y > 0)			// can go north
+				tiles.Push(((y + mapSize - 1) % mapSize) * width + x);
+			if (height == mapSize || y < height - 1)// can go south
+				tiles.Push(((y + 1) % mapSize) * width + x);
+			
+			for (int tile: tiles) {
 				// If the N/S/E/W tile is un-owned, claim it for the active segment
 				// and add it to the border.
 				if (segmentOwnerMap[tile] > newSegmentID &&
@@ -792,33 +797,28 @@ public class Plate {
 
 		int segNew = collisionSegments.size();
 		int segNeighbor = segNew;
-		if ((localX > 0) &&
-			heightMap[origin_index-1] >= Lithosphere.CONTINENTAL_BASE &&
-			segmentOwnerMap[origin_index-1] < segNew) {
-				segNeighbor = segmentOwnerMap[origin_index - 1];
-		} else if ((localX < width - 1) &&
-			heightMap[origin_index+1] >= Lithosphere.CONTINENTAL_BASE &&
-			segmentOwnerMap[origin_index+1] < segNew) {
-				segNeighbor = segmentOwnerMap[origin_index + 1];
-		} else if ((localY > 0) &&
-			heightMap[origin_index - width] >= Lithosphere.CONTINENTAL_BASE &&
-			segmentOwnerMap[origin_index - width] < segNew) {
-				segNeighbor = segmentOwnerMap[origin_index - width];
-		} else if ((localY < height - 1) &&
-			heightMap[origin_index + width] >= Lithosphere.CONTINENTAL_BASE &&
-			segmentOwnerMap[origin_index + width] < segNew) {
-				segNeighbor = segmentOwnerMap[origin_index + width];
+
+		Stack<Integer> tiles = new Stack<Integer>();
+		if (width == mapSize || localX > 0)				// can go west
+			tiles.Push(localY * width + (localX + mapSize - 1) % mapSize);
+		if (width == mapSize || localX < width - 1)		// can go east
+			tiles.Push(localY * width + (localX + 1) % mapSize);
+		if (height == mapSize || localY > 0)			// can go north
+			tiles.Push(((localY + mapSize - 1) % mapSize) * width + localX);
+		if (height == mapSize || localY < height - 1)	// can go south
+			tiles.Push(((localY + 1) % mapSize) * width + localX);
+		
+		for (int tile: tiles) {
+			if (heightMap[tile] >= Lithosphere.CONTINENTAL_BASE &&
+				segmentOwnerMap[tile] < segNew) {
+				segNeighbor = segmentOwnerMap[tile];
+				segmentOwnerMap[origin_index] = segNeighbor;
+				collisionSegments.get(segNeighbor).Area++;
+				collisionSegments.get(segNeighbor).UpdateBoundsToInclude(
+					Util.getX(tile, width), Util.getY(tile, width));
+				break;
+			}
 		}
-		if (segNeighbor < segNew) {
-			// A neighbor exists, this tile should be added to it instead
-			segmentOwnerMap[origin_index] = segNeighbor;
-			CollisionSegment segment = collisionSegments.elementAt(segNeighbor);
-			segment.Area++;
-			if (localX > segment.X0) segment.X0 = localX;
-			if (localX > segment.X1) segment.X1 = localX;
-			if (localY < segment.Y0) segment.Y0 = localY;
-			if (localY > segment.Y1) segment.Y1 = localY;
-		}		
 		return segNeighbor;
 	}
 
