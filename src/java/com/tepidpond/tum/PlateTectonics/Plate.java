@@ -244,8 +244,8 @@ public class Plate {
 		
 		plate.selectCollisionSegment(worldX, worldY);
 		
-		System.out.printf("Aggregating segment [%d, %d]x[%d, %d] vs. [%d, %d]@[%d, %d]\n",
-				segment.X0, segment.Y0, segment.X1, segment.Y1, width, height, localX, localY);
+		/* System.out.printf("Aggregating segment [%d, %d]x[%d, %d] vs. [%d, %d]@[%d, %d]\n",
+				segment.X0, segment.Y0, segment.X1, segment.Y1, width, height, localX, localY); */
 
 		worldX += mapSize; worldY += mapSize;
 		float M_old = M;
@@ -349,7 +349,7 @@ public class Plate {
 		float dotProduct = relVX * normalX + relVY * normalY;
 		
 		if (dotProduct <= 0) {
-			System.out.printf("n=%.2f, r=%.2f, %.2f, dot=%.4f\n", normalX, normalY, relVX, relVY, dotProduct);
+			//System.out.printf("n=%.2f, r=%.2f, %.2f, dot=%.4f\n", normalX, normalY, relVX, relVY, dotProduct);
 			return;	// plates moving away from each other.
 		}
 
@@ -684,8 +684,8 @@ public class Plate {
 			if (top < 0) top += mapSize;
 			height += dist[1] + dist[3];
 			
-			System.out.printf("%dx%d + [%d, %d] + [%d, %d] = %dx%d\n",
-				oldWidth, oldHeight, dist[0], dist[1], dist[2], dist[3], width, height);
+			/* System.out.printf("%dx%d + [%d, %d] + [%d, %d] = %dx%d\n",
+				oldWidth, oldHeight, dist[0], dist[1], dist[2], dist[3], width, height); */
 			
 			// Reallocate plate data storage
 			float[] tmpHmap = new float[width * height];
@@ -798,10 +798,10 @@ public class Plate {
 			border.Pop();			
 		}
 		
-		if (false && newSegment.Area > 0)
+		/* if (newSegment.Area > 0)
 			System.out.printf("New segment created, ID %d. [%d,%d]-[%d,%d](%dx%d) @ (%d,%d).\n",
 				newSegmentID,
-				newSegment.X0, newSegment.Y0, newSegment.X1, newSegment.Y1, newSegment.getW(), newSegment.getH(), localX, localY);
+				newSegment.X0, newSegment.Y0, newSegment.X1, newSegment.Y1, newSegment.getW(), newSegment.getH(), localX, localY); */
 		
 		collisionSegments.addElement(newSegment);		
 		return newSegmentID;
