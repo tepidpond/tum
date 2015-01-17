@@ -1,9 +1,12 @@
 package com.tepidpond.tum;
 
+import java.util.Date;
+
 import net.minecraft.world.WorldType;
 import net.minecraftforge.common.MinecraftForge;
 
 import com.tepidpond.tum.PlateTectonics.Lithosphere;
+import com.tepidpond.tum.PlateTectonics.Util;
 import com.tepidpond.tum.WorldGen.TUMWorldType;
 
 import cpw.mods.fml.client.FMLClientHandler;
@@ -29,9 +32,16 @@ public class TUM
    			2,		// number of plate recreation cycles
    			10,		// number of plates to create
    			0);		// creation seed
+		Util.displayHeightmap(lithos.getHeightmap(), lithos.getMapSize(), lithos.getMapSize(), "Terrain");
+       	long dateBegin = System.currentTimeMillis();
     	for (int i=0; i<6000; i++) {
     		lithos.Update();
+    		if (i % 32 == 0)
+    			Util.displayHeightmap(lithos.getHeightmap(), lithos.getMapSize(), lithos.getMapSize(), "Terrain");
     	}
+    	float seconds = (System.currentTimeMillis() - dateBegin) / 1000f;
+		Util.displayHeightmap(lithos.getHeightmap(), lithos.getMapSize(), lithos.getMapSize(), "Terrain");
+    	assert false: String.format("Completed inital generation in %f seconds.", seconds);
     }
     
     @EventHandler

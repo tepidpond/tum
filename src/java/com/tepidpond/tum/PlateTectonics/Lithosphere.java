@@ -101,8 +101,6 @@ public class Lithosphere {
 			return;
 		}
 
-		Util.displayHeightmap(worldMap, worldSize, worldSize, "t" + Integer.toString(generations));
-		
 		moveAndErodePlates();
 		int continentalCollisions = 0;
 		int worldPlatesOld[] = new int[worldPlates.length];
