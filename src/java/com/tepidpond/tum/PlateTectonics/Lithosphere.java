@@ -425,7 +425,7 @@ public class Lithosphere {
 			if (heightMap[i] > seaLevel)
 				heightMap[i] += CONTINENTAL_BASE;
 			else
-				heightMap[i] += OCEANIC_BASE;			
+				heightMap[i] = OCEANIC_BASE;			
 		}
 	}
 	
