@@ -179,6 +179,25 @@ public class Lithosphere {
 			} else {
 				numPlates = 0;
 				addSeaFloorUplift(worldAge);
+				
+				int noiseArea = (int) Math.pow(worldSize + 1, 2.0);
+				float[] tmp = new float[noiseArea];
+				Arrays.fill(tmp, 0);
+				SquareDiamond.SqrDmd(tmp, worldSize + 1, 1.0f, SQRDMD_ROUGHNESS, rand.nextInt());
+				Util.normalizeHeightMap(tmp);
+				
+				float[] tmp2 = new float[worldSurface];
+				for (int i = 0; i < worldSize; i++)
+					System.arraycopy(tmp, i * (worldSize + 1), tmp2, i * worldSize, worldSize);
+				
+				for (int i = 0; i < worldSurface; i++) {
+					
+					if (worldMap[i] > CONTINENTAL_BASE) {
+						worldMap[i] += tmp2[i] * 2;
+					} else {
+						worldMap[i] = 0.8f * worldMap[i] + 0.2f * tmp2[i] * CONTINENTAL_BASE;
+					}
+				}
 			}
 		}
 	}
