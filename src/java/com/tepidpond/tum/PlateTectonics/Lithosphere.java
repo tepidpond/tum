@@ -198,7 +198,7 @@ public class Lithosphere {
 		float totalKineticEnergy = 0;
 		
 		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
-			totalVelocity += plates[activePlate].getVelocity();
+			totalVelocity += plates[activePlate].Velocity;
 			totalKineticEnergy += plates[activePlate].getMomentum();
 		}
 		if (totalKineticEnergy > peakKineticEnergy)
@@ -225,8 +225,8 @@ public class Lithosphere {
 
 		int prev_timestamp = plates[(int) worldPlates[worldTile]].getCrustTimestamp(worldX, worldY);
 		int this_timestamp = plateAge[plateTile];
-		boolean prev_is_bouyant = (worldMap[worldTile] > plateMap[plateTile]) |
-			(Math.abs(worldMap[worldTile] - plateMap[plateTile]) < 2 * Util.FLT_EPSILON &
+		boolean prev_is_bouyant = (worldMap[worldTile] > plateMap[plateTile]) ||
+			(Math.abs(worldMap[worldTile] - plateMap[plateTile]) < 2 * Util.FLT_EPSILON &&
 			 prev_timestamp >= this_timestamp);
 
 		// Handle subduction of oceanic crust as special case.
@@ -239,7 +239,7 @@ public class Lithosphere {
 			float sediment = OCEANIC_BASE * (CONTINENTAL_BASE - plateMap[plateTile]) / CONTINENTAL_BASE;
 
 			// Save collision to the receiving plate's list.
-			subductions[(int) worldPlates[worldTile]].Push(
+			subductions[worldPlates[worldTile]].Push(
 					new CollisionDetails(activePlate, worldX, worldY, sediment));
 
 			// Remove subducted oceanic lithosphere from plate.
@@ -254,11 +254,10 @@ public class Lithosphere {
 		} else if (prev_is_oceanic) {
 			float sediment = OCEANIC_BASE * (CONTINENTAL_BASE - worldMap[worldTile]) / CONTINENTAL_BASE;
 
-			subductions[(int) worldPlates[worldTile]].Push(
-					new CollisionDetails(activePlate, worldX, worldY, sediment));
+			subductions[activePlate].Push(
+					new CollisionDetails(worldPlates[worldTile], worldX, worldY, sediment));
 
-			plates[activePlate].setCrust(worldX, worldY, worldMap[worldTile] - OCEANIC_BASE, prev_timestamp);
-
+			plates[worldPlates[worldTile]].setCrust(worldX, worldY, worldMap[worldTile] - OCEANIC_BASE, prev_timestamp);
 			worldMap[worldTile] -= OCEANIC_BASE;
 
 			if (worldMap[worldTile] <= 0)
@@ -298,7 +297,7 @@ public class Lithosphere {
 			// Give the location to the larger plate.
 			assert(!Float.isNaN(plateMap[plateTile]));
 			worldMap[worldTile] = plateMap[plateTile];
-			worldMap[worldTile] = activePlate;
+			worldPlates[worldTile] = activePlate;
 			ageMap[worldTile] = plateAge[plateTile];
 		}
 		return 1;
@@ -310,7 +309,7 @@ public class Lithosphere {
 			for (CollisionDetails cd: subductions[activePlate]) {
 				plates[activePlate].addCrustBySubduction(
 					cd.getX(), cd.getY(), cd.getCrust(), generations,
-					plates[cd.getIndex()].getVelocityX(), plates[cd.getIndex()].getVelocityY());
+					plates[cd.getIndex()].vX, plates[cd.getIndex()].vY);
 			}
 			subductions[activePlate].clear();
 		}
@@ -329,8 +328,7 @@ public class Lithosphere {
 				
 				if ((collisionCount > aggr_ratio_abs) | (collisionRatio > aggr_ratio_rel)) {
 					float amount = plates[activePlate].aggregateCrust(plates[cd.getIndex()], cd.getX(), cd.getY());
-					if (amount > 0)	// zero indicates already collided because segment has been cleared.
-						plates[cd.getIndex()].collide(plates[activePlate], cd.getX(), cd.getY(), amount);
+					plates[cd.getIndex()].collide(plates[activePlate], cd.getX(), cd.getY(), amount);
 				}
 			}
 			collisions[activePlate].clear();
@@ -408,30 +406,20 @@ public class Lithosphere {
 				int x = Util.getX(worldTile, worldSize);
 				int y = Util.getY(worldTile, worldSize);
 				
-				// in the 4 cardinal directions, clamp at border.
-				int tileN, tileS, tileW, tileE;
-				tileN = Util.getTile(x, Math.max(y - 1, 0), worldSize);
-				tileS = Util.getTile(x, Math.min(y + 1, worldSize - 1), worldSize);
-				tileW = Util.getTile(Math.max(x - 1, 0), y, worldSize);
-				tileE = Util.getTile(Math.min(x + 1, worldSize - 1), y, worldSize);
+				// in the 4 cardinal directions, allow wrapping.
+				Stack<Integer> tiles = new Stack<Integer>();
+				tiles.Push(Util.getTile(x, (y + worldSize - 1) % worldSize, worldSize));
+				tiles.Push(Util.getTile(x, (y + 1) % worldSize, worldSize));
+				tiles.Push(Util.getTile((x + worldSize - 1) % worldSize, y, worldSize));
+				tiles.Push(Util.getTile((x + 1) % worldSize, y, worldSize));
 				
 				// If the N/S/E/W tile is un-owned, claim it for the active plate
 				// and add it to that plate's border.
-				if (worldPlates[tileN] >= numPlates) {
-					worldPlates[tileN] = activePlate;
-					plates[activePlate].pushBorder(tileN);
-				}
-				if (worldPlates[tileS] >= numPlates) {
-					worldPlates[tileS] = activePlate;
-					plates[activePlate].pushBorder(tileS);
-				}
-				if (worldPlates[tileW] >= numPlates) {
-					worldPlates[tileW] = activePlate;
-					plates[activePlate].pushBorder(tileW);
-				}
-				if (worldPlates[tileE] >= numPlates) {
-					worldPlates[tileE] = activePlate;
-					plates[activePlate].pushBorder(tileE);
+				for (int tile: tiles) {
+					if (worldPlates[tile] >= numPlates) {
+						worldPlates[tile] = activePlate;
+						plates[activePlate].pushBorder(tile);
+					}
 				}
 				
 				// Overwrite processed point in border with last item from border
@@ -475,7 +463,7 @@ public class Lithosphere {
 			if (heightMap[i] > seaLevel)
 				heightMap[i] += CONTINENTAL_BASE;
 			else
-				heightMap[i] += OCEANIC_BASE;			
+				heightMap[i] = OCEANIC_BASE;			
 		}
 	}
 	

@@ -19,7 +19,16 @@ public class TUM
     public static WorldType TUMWorldType = new TUMWorldType("TUMDefault");
     
     public static void main(String[] args) {
-       	Lithosphere lithos = new Lithosphere(512, 0.65f, 60, 0.001f, 5000, 0.1f, 2, 10, 0);
+       	Lithosphere lithos = new Lithosphere(
+   			512,	// world size
+   			0.65f,	// land/sea ratio
+   			60,		// generations between erosion calls
+   			0.001f,	// folding ratio
+   			5000,	// overlapping tiles causing aggregation
+   			0.1f,	// overlapping tile ratio causing aggregation
+   			2,		// number of plate recreation cycles
+   			10,		// number of plates to create
+   			0);		// creation seed
     	for (int i=0; i<6000; i++) {
     		lithos.Update();
     	}
