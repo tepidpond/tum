@@ -30,6 +30,8 @@ public class Lithosphere {
 	
 	private float peakKineticEnergy = 0.0f;
 	private int generationsSinceCollision = 0;
+	private int maxCycles = 0;	// unlimited
+	private int numCycles = 0;	// number of times plate system has restarted
 	private int generations = 0;
 	private int erosionPeriod = 1;
 	private float foldingRatio = 0.5f;
@@ -44,7 +46,7 @@ public class Lithosphere {
 	public Lithosphere(int mapSize, float percentSeaTiles, int erosion_period, float folding_ratio,
 			int aggr_ratio_abs, float aggr_ratio_rel, int num_cycles, int _numPlates, long seed) {
 
-
+		this.maxCycles = num_cycles;
 		this.aggr_ratio_abs = aggr_ratio_abs;
 		this.aggr_ratio_rel = aggr_ratio_rel;
 		this.foldingRatio = folding_ratio;
@@ -93,8 +95,11 @@ public class Lithosphere {
 		generationsSinceCollision = 0;
 	}
 	
-	public boolean Update() {
-		if (checkForStaticWorld()) return false;
+	public void Update() {
+		if (checkForStaticWorld()) {
+			restart();
+			return;
+		}
 
 		Util.displayHeightmap(worldMap, worldSize, worldSize, "t" + Integer.toString(generations));
 		
@@ -142,7 +147,40 @@ public class Lithosphere {
 		addSeaFloorUplift(worldAgeMap);
 		
 		generations++;
-		return true;
+	}
+	
+	private void restart() {
+		if (++numCycles <= maxCycles || maxCycles == 0) {
+			generations = 0;
+			// Copy plates to world map.
+			int worldAge[] = new int[worldSurface];
+			Arrays.fill(worldMap, 0);
+			for (int activePlate = 0; activePlate < numPlates; activePlate++) {
+				int x0 = plates[activePlate].getLeft(),
+					y0 = plates[activePlate].getTop(),
+					x1 = x0 + plates[activePlate].getWidth(),
+					y1 = y0 + plates[activePlate].getHeight();
+				float[] plateMap = plates[activePlate].getHeightmap();
+				int[] plateAge = plates[activePlate].getTimestampMap();
+				for (int y = y0, tile = 0; y < y1; y++) {
+					for (int x = x0; x < x1; x++, tile++) {
+						worldMap[(y % worldSize) * worldSize + x % worldSize] += plateMap[tile];
+						worldAge[(y % worldSize) * worldSize + x % worldSize] = plateAge[tile];
+					}
+				}
+			}
+			
+			// Create new plates if there are cycles remaining
+			plates = new Plate[numPlates];
+			if (numCycles < maxCycles || maxCycles == 0) {
+				PlateArea[] plates = createPlates();
+				growPlates(plates);
+				this.plates = extractPlates(plates);
+			} else {
+				numPlates = 0;
+				addSeaFloorUplift(worldAge);
+			}
+		}
 	}
 	
 	private void moveAndErodePlates() {
