@@ -290,8 +290,7 @@ public class Lithosphere {
 				
 				if ((collisionCount > aggr_ratio_abs) | (collisionRatio > aggr_ratio_rel)) {
 					float amount = plates[activePlate].aggregateCrust(plates[cd.getIndex()], cd.getX(), cd.getY());
-					if (amount > 0)	// zero indicates already collided because segment has been cleared.
-						plates[cd.getIndex()].collide(plates[activePlate], cd.getX(), cd.getY(), amount);
+					plates[cd.getIndex()].collide(plates[activePlate], cd.getX(), cd.getY(), amount);
 				}
 			}
 			collisions[activePlate].clear();

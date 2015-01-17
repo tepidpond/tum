@@ -350,56 +350,44 @@ public class Plate {
 		// vector is constructed as the sum of vectors <massCenterA, P> and
 		// <P, massCenterB>. This solution works because collisions always
 		// happen in the overlapping region of the two plates.
-		
-		int plateA_X = this.getLocalX(worldX), plateA_Y = this.getLocalY(worldY);
-		int plateB_X = plate.getLocalX(worldX), plateB_Y = plate.getLocalY(worldY);
 
 		assert worldTileIsOnPlate(worldX, worldY) && plate.worldTileIsOnPlate(worldX, worldY):
 			String.format("@%d, %d: Out of colliding map's bounds!\n", worldX, worldY);
 		
-		float plateA_dX = (int)plateA_X - (int)R_x;
-		float plateA_dY = (int)plateA_Y - (int)R_y;
-		float plateB_dX = (int)plateB_X - (int)plate.R_x;
-		float plateB_dY = (int)plateB_Y - (int)plate.R_y;
-		float normalX = plateA_dX - plateB_dX;
-		float normalY = plateA_dY - plateB_dY;
+		Vector2f normal = Vector2f.add(				
+				Vector2f.sub(
+					new Vector2f(getLocalX(worldX), getLocalY(worldY)),
+					new Vector2f(R_x, R_y),
+					null),
+				Vector2f.sub(
+					new Vector2f(plate.R_x, plate.R_y),
+					new Vector2f(plate.getLocalX(worldX), plate.getLocalY(worldY)),
+					null),
+				null);
+		normal.normalise();
 
-		// Scaling is required at last when impulses are added to plates!
-		float magnitude = normalX * normalX + normalY * normalY;
-		if (magnitude <= 0)
-			return;		// avoid division by zero
-		magnitude = (float)Math.sqrt(magnitude);
-		normalX /= magnitude; normalY /= magnitude;	// normalize collision vector
-		
 		// Compute relative velocity between plates at the collision point.
 		// Because torque is not included, calc simplifies to v_ab = v_a - v_b.
-		float relVX = vX - plate.vX, relVY = vY - plate.vY;	// find relative velocity vector
-		float dotProduct = relVX * normalX + relVY * normalY;
+		Vector2f relVelocity = Vector2f.sub(
+				new Vector2f(vX, vY),
+				new Vector2f(plate.vX, plate.vY),
+				null);
 		
-		if (dotProduct <= 0) {
+		float dot = Vector2f.dot(relVelocity, normal);
+		if (dot > 0) {
 			//System.out.printf("n=%.2f, r=%.2f, %.2f, dot=%.4f\n", normalX, normalY, relVX, relVY, dotProduct);
 			return;	// plates moving away from each other.
 		}
 
-		// Calculate the denominator of impulse: n . n * (1 / m_1 + 1 / m_2).
-		// Use the mass of the colliding crust for the "donator" plate.
-		// Somewhat arbitrarily use limits instead of allowing the NaN virus to
-		// propagate. More defensive than actually necessary.
-		float denominatorOfImpulse = (normalX * normalX + normalY * normalY) * 
-				((M == 0 ? 0 : 1.0f / M) + (collidingMass == 0 ? 0 : 1.0f / collidingMass));
+		float J = -(1 + coefficientRestitution) * dot;
+		J /= (invMass + 1f / collidingMass);
 		
-		// force of impulse
-		float J = -(1 + coefficientRestitution) * dotProduct / denominatorOfImpulse;
-		
-		// Finally apply an acceleration;
-		if (M > 0) {
-				dX += normalX * J / M;
-				dY += normalY * J / M;
-		}
-		if (plate.M > 0) {
-			plate.dX -= normalX * J / (collidingMass + plate.M);
-			plate.dY -= normalY * J / (collidingMass + plate.M);
-		}
+		Vector2f impulse = (Vector2f) normal.scale(J);
+
+		dX += impulse.x * invMass;
+		dY += impulse.y * invMass;
+		plate.dX -= impulse.x * plate.invMass;
+		plate.dY -= impulse.y * plate.invMass;
 	}
 	
 	/**
