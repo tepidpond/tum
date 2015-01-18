@@ -1,20 +1,14 @@
 package com.tepidpond.tum.WorldGen;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Random;
 
 import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
-import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
-import net.minecraft.world.WorldSavedData;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.gen.ChunkProviderGenerate;
 
-import com.tepidpond.tum.G;
 import com.tepidpond.tum.PlateTectonics.Lithosphere;
 import com.tepidpond.tum.PlateTectonics.Util;
 
@@ -83,13 +77,13 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 		if (X > 0) {
 			x0 = 1; x1 = 2;
 		} else if (X < 0) {
-			X = (1 - X);
+			X = -X;
 			x0 = 1; x1 = 0;
 		}
 		if (Y > 0) {
 			y0 = 1; y1 = 2;
 		} else if (Y < 0) {
-			Y = (1 - Y);
+			Y = -Y;
 			y0 = 1; y1 = 0;
 		}
 		
@@ -110,8 +104,8 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 		int hmSourceZ = (chunkZ + data.getMapSize() / 2) % data.getMapSize();
 		if (hmSourceX < 0 || hmSourceZ < 0) return;		// empty chunks outside generation border.
 
-		for (int x = 0; x < 3; x++) {
-			for (int z = 0; z < 3; z++) {
+		for (int z = 0; z < 3; z++) {
+			for (int x = 0; x < 3; x++) {
 				int hmX = hmSourceX + x - 1;
 				int hmZ = hmSourceZ + z - 1;
 				if (hmX < 0) hmX = 0; if (hmX >= data.getMapSize()) hmX = data.getMapSize() - 1;
@@ -126,13 +120,13 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 		{
 			for (int z = 0; z<16; z++)
 			{
-				int sample = (int) (128f * quadInterpolate(vals, (x - 8f) / 8f, (z - 8f) / 8f));
+				int sample = (int) (128f * quadInterpolate(vals, (x - 8f) / 16f, (z - 8f) / 16f));
 				
 				int arrayIndex = x + z * 16;
 				for (int height = 127; height >= 0; height--)
 				{
-					int indexBig = arrayIndex * worldHeight + height + indexOffset;
-					int indexTop = arrayIndex * 128 + height;
+					int indexBig = x * 16 * 256 | z * 256 | height;
+
 					if (sample > height)
 						idsBig[indexBig] = Blocks.stone;
 					else
