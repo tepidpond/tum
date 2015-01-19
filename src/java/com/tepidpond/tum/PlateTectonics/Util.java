@@ -3,44 +3,77 @@ package com.tepidpond.tum.PlateTectonics;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.awt.Insets;
 import java.awt.image.BufferedImage;
 import java.io.File;
 
 import javax.imageio.ImageIO;
 import javax.swing.ImageIcon;
+import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.WindowConstants;
 
 public class Util {
 	public static class ImageViewer {
-		private static ImageViewer _instance = new ImageViewer();
+		private static final int maxInstances = 32;
+		private static ImageViewer _instances[] = new ImageViewer[maxInstances];
 		private JFrame frame;
 		private JLabel label;
-		private ImageViewer() {
-			_instance = this;
-			frame = new JFrame("Image Viewer");
+		
+		private ImageViewer() { this(0); }		
+		private ImageViewer(int index) {
+			if (index < 0 || index >= maxInstances)
+				throw new IllegalArgumentException(String.format("You only get %d instances of the viewer.", maxInstances));
+			_instances[index] = this;
+			if (index == 0)
+				frame = new JFrame(String.format("Image Viewer %d", index));
+			else 
+				frame = new JFrame("Image Viewer");
 			label = new JLabel();
 			frame.getContentPane().add(label, BorderLayout.CENTER);
 			frame.pack();
-			frame.setLocationRelativeTo(null);
-			frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+			if (index == 0) {
+				frame.setLocationRelativeTo(null);
+				frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+			} else {
+				frame.setLocationRelativeTo(_instances[index - 1].frame);
+				frame.setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
+			}
 			Hide();
 		}
-		public static void DisplayImage(BufferedImage bi) {
-			_instance.label.setIcon(new ImageIcon(bi));
-			_instance.frame.setSize(bi.getWidth(), bi.getHeight());
-			_instance.frame.setLocation(20, 20);
-			Show();
+		
+		public static void DisplayImage(BufferedImage bi) { DisplayImage(bi, 0); }
+		public static void DisplayImage(BufferedImage bi, int index) {
+			if (_instances[index] == null) _instances[index] = new ImageViewer(index);
+			_instances[index].label.setIcon(new ImageIcon(bi));
+			
+			Insets ins = _instances[index].frame.getInsets();
+			
+			_instances[index].frame.setSize(
+					bi.getWidth() + ins.left + ins.right,
+					bi.getHeight() + ins.bottom + ins.top);
+				
+			Show(index);
 		}
-		public static void SetCaption(String caption) {
-			_instance.frame.setTitle(caption);
+
+		public static void SetCaption(String caption) { SetCaption(caption, 0); }
+		public static void SetCaption(String caption, int index) {
+			if (_instances[index] == null) _instances[index] = new ImageViewer(index);
+			_instances[index].frame.setTitle(String.format("Image Viewer %d - ", index) + caption);
 		}
-		public static void Hide() {
-			_instance.frame.setVisible(false);
+		
+		public static void Hide() { Hide(0); }
+		public static void Hide(int index) {
+			if (_instances[index] == null) _instances[index] = new ImageViewer(index);
+			_instances[index].frame.setVisible(false);
 		}
-		public static void Show() {
-			_instance.frame.setVisible(true);
+		
+		public static void Show() { Show(0); }
+		public static void Show(int index) {
+			if (_instances[index] == null) _instances[index] = new ImageViewer(index);
+			if (!_instances[index].frame.isVisible())
+				_instances[index].frame.setVisible(true);
 		}
 	}
 	
@@ -131,8 +164,8 @@ public class Util {
 	public static final void displayHeightmap(float heightMap[], int mapWidth, String tag) {
 		displayImage(renderHeightmap(heightMap, mapWidth, mapWidth), tag);
 	}
-	public static final void displayHeightmap(float heightMap[], int mapWidth, int mapHeight, String tag) {
-		displayImage(renderHeightmap(heightMap, mapWidth, mapHeight), tag);
+	public static final void displayHeightmap(int index, float heightMap[], int mapWidth, int mapHeight, String tag) {
+		displayImage(renderHeightmap(heightMap, mapWidth, mapHeight), index, tag);
 	}
 	public static final void displayIntmap(int Intmap[], int mapWidth, String tag) {
 		displayImage(renderIntmap(Intmap, mapWidth, mapWidth), tag);
@@ -152,9 +185,10 @@ public class Util {
 	public static final void saveIntmap(int Intmap[], int mapWidth, int mapHeight, String tag) {
 		saveImage(renderIntmap(Intmap, mapWidth, mapHeight), tag);
 	}
-	public static final void displayImage(BufferedImage bi, String tag) {
-		ImageViewer.DisplayImage(bi);
-		ImageViewer.SetCaption(tag);
+	public static final void displayImage(BufferedImage bi, String tag) { displayImage(bi, 0, tag); }
+	public static final void displayImage(BufferedImage bi, int index, String tag) {
+		ImageViewer.DisplayImage(bi, index);
+		ImageViewer.SetCaption(tag, index);
 	}
 	public static final void saveImage(BufferedImage bi, String tag) {
 		try {
