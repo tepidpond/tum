@@ -15,7 +15,7 @@ import com.tepidpond.tum.PlateTectonics.Util;
 public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 	private World worldObj;
 	private Lithosphere lithos;
-	private TUMWorldGenData data;
+	private TUMPerWorldData data;
 	private Random rand;
 	
 	private Block[] idsTop;

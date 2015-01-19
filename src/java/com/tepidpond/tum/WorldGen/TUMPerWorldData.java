@@ -13,9 +13,8 @@ import net.minecraft.world.WorldSavedData;
 import com.tepidpond.tum.G;
 import com.tepidpond.tum.PlateTectonics.Lithosphere;
 
-public class TUMWorldGenData extends WorldSavedData {
-	private static final String tagWorldGen = G.ModID;
-	private NBTTagCompound data = new NBTTagCompound();
+public class TUMPerWorldData extends WorldSavedData {
+	private static final String tagPerWorldData = G.ModID;
 	private final String tagName;
 	
 	/* Region: Items saved in TUM.WorldGen.Settings */
@@ -33,12 +32,12 @@ public class TUMWorldGenData extends WorldSavedData {
 	private float[] heightMap;
 	private boolean heightMapGenerated = false;
 	
-	public TUMWorldGenData() {
-		super(tagWorldGen);
-		this.tagName = tagWorldGen;
+	public TUMPerWorldData() {
+		super(tagPerWorldData);
+		this.tagName = tagPerWorldData;
 	}
 	
-	public TUMWorldGenData(String tagName) {
+	public TUMPerWorldData(String tagName) {
 		super(tagName);
 		this.tagName = tagName;
 	}
@@ -121,11 +120,11 @@ public class TUMWorldGenData extends WorldSavedData {
 		compound.setTag("WorldGen", nbtWorldGen);
 	}
 	
-	public static TUMWorldGenData get(World world) {
-		TUMWorldGenData data = (TUMWorldGenData)world.loadItemData(TUMWorldGenData.class, tagWorldGen);
+	public static TUMPerWorldData get(World world) {
+		TUMPerWorldData data = (TUMPerWorldData)world.loadItemData(TUMPerWorldData.class, tagPerWorldData);
 		if (data == null) {
-			data = new TUMWorldGenData(tagWorldGen);
-			world.setItemData(tagWorldGen, data);
+			data = new TUMPerWorldData(tagPerWorldData);
+			world.setItemData(tagPerWorldData, data);
 		}
 		return data;
 	}
