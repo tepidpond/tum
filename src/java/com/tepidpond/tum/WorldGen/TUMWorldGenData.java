@@ -14,7 +14,7 @@ import com.tepidpond.tum.G;
 import com.tepidpond.tum.PlateTectonics.Lithosphere;
 
 public class TUMWorldGenData extends WorldSavedData {
-	private static final String tagWorldGen = G.ModID + ".WorldGen";
+	private static final String tagWorldGen = G.ModID;
 	private NBTTagCompound data = new NBTTagCompound();
 	private final String tagName;
 	
@@ -45,7 +45,8 @@ public class TUMWorldGenData extends WorldSavedData {
 
 	@Override
 	public void readFromNBT(NBTTagCompound compound) {
-		NBTTagCompound nbtSettings = compound.getCompoundTag("Settings");
+		NBTTagCompound nbtWorldGen = compound.getCompoundTag("WorldGen");
+		NBTTagCompound nbtSettings = nbtWorldGen.getCompoundTag("Settings");
 		if (nbtSettings != null) {
 			if (nbtSettings.hasKey("mapSize"))       mapSize =       nbtSettings.getInteger("mapSize");
 			if (nbtSettings.hasKey("landSeaRatio"))  landSeaRatio =  nbtSettings.getFloat("landSeaRatio");
@@ -58,12 +59,12 @@ public class TUMWorldGenData extends WorldSavedData {
 			if (nbtSettings.hasKey("maxGens"))       maxGens =       nbtSettings.getInteger("maxGens");
 		}
 
-		NBTTagCompound nbtStorage = compound.getCompoundTag("Storage");
+		NBTTagCompound nbtStorage = nbtWorldGen.getCompoundTag("Storage");
 		float[] heightMap = new float[(int) Math.pow(mapSize, 2)];
-		if (nbtStorage != null && nbtStorage.hasKey("HeightMap") && nbtStorage.hasKey("HeightMapGenerated")) {
+		if (nbtStorage != null && nbtStorage.hasKey("heightMap") && nbtStorage.hasKey("heightMapGenerated")) {
 			// Load packed heightmap from NBT
-			byte[] byteArray = nbtStorage.getByteArray("HeightMap");
-			heightMapGenerated = nbtStorage.getBoolean("HeightMapGenerated");
+			byte[] byteArray = nbtStorage.getByteArray("heightMap");
+			heightMapGenerated = nbtStorage.getBoolean("heightMapGenerated");
 			if (byteArray.length == heightMap.length * 4 && heightMapGenerated) {
 				DataInputStream dis = new DataInputStream(new ByteArrayInputStream(byteArray));
 				try {
@@ -74,7 +75,7 @@ public class TUMWorldGenData extends WorldSavedData {
 				} catch (IOException e) {
 					// There is no need to be upset. Just regenerate it. An extra minute at world
 					// load time is only annoying.
-					nbtStorage.removeTag("HeightMap");
+					nbtStorage.removeTag("heightMap");
 					heightMapGenerated = false;
 				}
 			} else {
@@ -87,36 +88,37 @@ public class TUMWorldGenData extends WorldSavedData {
 
 	@Override
 	public void writeToNBT(NBTTagCompound compound) {
-		NBTTagCompound nbtSettings = compound.getCompoundTag("Settings");
-		if (nbtSettings != null) {
-			nbtSettings.setInteger("mapSize",       mapSize);
-			nbtSettings.setFloat(  "landSeaRatio",  landSeaRatio);
-			nbtSettings.setInteger("erosionPeriod", erosionPeriod);
-			nbtSettings.setFloat(  "foldingRatio",  foldingRatio);
-			nbtSettings.setInteger("aggrRatioAbs",  aggrRatioAbs);
-			nbtSettings.setFloat(  "aggrRatioRel",  aggrRatioRel);
-			nbtSettings.setInteger("maxCycles",     maxCycles);
-			nbtSettings.setInteger("numPlates",     numPlates);
-			nbtSettings.setInteger("maxGens",       maxGens);
-		}
-		NBTTagCompound nbtStorage = compound.getCompoundTag("Storage");
-		if (nbtStorage != null) {
-			if (heightMapGenerated) {
-				try {
-					ByteArrayOutputStream baos = new ByteArrayOutputStream();
-					DataOutputStream dos = new DataOutputStream(baos);
-					for(int i = 0; i < heightMap.length; i++) {
-						dos.writeFloat(heightMap[i]);
-					}
-					nbtStorage.setByteArray("HeightMap", baos.toByteArray());
-				} catch (IOException e) {
-					// This is a problem.
-					heightMapGenerated = false;
-					assert false: "Cause for panic, unable to save HeightMap to NBT";
+		NBTTagCompound nbtWorldGen = new NBTTagCompound();
+		NBTTagCompound nbtSettings = new NBTTagCompound();
+		nbtSettings.setInteger("mapSize",       mapSize);
+		nbtSettings.setFloat(  "landSeaRatio",  landSeaRatio);
+		nbtSettings.setInteger("erosionPeriod", erosionPeriod);
+		nbtSettings.setFloat(  "foldingRatio",  foldingRatio);
+		nbtSettings.setInteger("aggrRatioAbs",  aggrRatioAbs);
+		nbtSettings.setFloat(  "aggrRatioRel",  aggrRatioRel);
+		nbtSettings.setInteger("maxCycles",     maxCycles);
+		nbtSettings.setInteger("numPlates",     numPlates);
+		nbtSettings.setInteger("maxGens",       maxGens);
+		nbtWorldGen.setTag("Settings", nbtSettings);
+		
+		if (heightMapGenerated) {
+			NBTTagCompound nbtStorage = new NBTTagCompound();
+			try {
+				ByteArrayOutputStream baos = new ByteArrayOutputStream();
+				DataOutputStream dos = new DataOutputStream(baos);
+				for(int i = 0; i < heightMap.length; i++) {
+					dos.writeFloat(heightMap[i]);
 				}
+				nbtStorage.setByteArray("heightMap", baos.toByteArray());
+				nbtStorage.setBoolean("heightMapGenerated", heightMapGenerated);
+				nbtWorldGen.setTag("Storage", nbtStorage);
+			} catch (IOException e) {
+				// This is a problem.
+				heightMapGenerated = false;
+				assert false: "Cause for panic, unable to save HeightMap to NBT";
 			}
-			nbtStorage.setBoolean("HeightMapGenerated", heightMapGenerated);
 		}
+		compound.setTag("WorldGen", nbtWorldGen);
 	}
 	
 	public static TUMWorldGenData get(World world) {
@@ -140,6 +142,7 @@ public class TUMWorldGenData extends WorldSavedData {
 			this.mapSize = mapSize;
 			this.heightMap = heightMap;
 			heightMapGenerated = true;
+			this.markDirty();
 		}
 	}
 	
@@ -151,6 +154,7 @@ public class TUMWorldGenData extends WorldSavedData {
 		if (mapSize != this.mapSize)
 			heightMapGenerated = false;
 		this.mapSize = mapSize;
+		this.markDirty();
 	}
 
 	public float getLandSeaRatio() {
@@ -159,6 +163,7 @@ public class TUMWorldGenData extends WorldSavedData {
 
 	public void setLandSeaRatio(float landSeaRatio) {
 		this.landSeaRatio = landSeaRatio;
+		this.markDirty();
 	}
 
 	public int getErosionPeriod() {
@@ -167,6 +172,7 @@ public class TUMWorldGenData extends WorldSavedData {
 
 	public void setErosionPeriod(int erosionPeriod) {
 		this.erosionPeriod = erosionPeriod;
+		this.markDirty();
 	}
 
 	public float getFoldingRatio() {
@@ -175,6 +181,7 @@ public class TUMWorldGenData extends WorldSavedData {
 
 	public void setFoldingRatio(float foldingRatio) {
 		this.foldingRatio = foldingRatio;
+		this.markDirty();
 	}
 
 	public int getAggrRatioAbs() {
@@ -183,6 +190,7 @@ public class TUMWorldGenData extends WorldSavedData {
 
 	public void setAggrRatioAbs(int aggrRatioAbs) {
 		this.aggrRatioAbs = aggrRatioAbs;
+		this.markDirty();
 	}
 
 	public float getAggrRatioRel() {
@@ -191,6 +199,7 @@ public class TUMWorldGenData extends WorldSavedData {
 
 	public void setAggrRatioRel(float aggrRatioRel) {
 		this.aggrRatioRel = aggrRatioRel;
+		this.markDirty();
 	}
 
 	public int getMaxCycles() {
@@ -199,6 +208,7 @@ public class TUMWorldGenData extends WorldSavedData {
 
 	public void setMaxCycles(int maxCycles) {
 		this.maxCycles = maxCycles;
+		this.markDirty();
 	}
 
 	public int getNumPlates() {
@@ -207,6 +217,7 @@ public class TUMWorldGenData extends WorldSavedData {
 
 	public void setNumPlates(int numPlates) {
 		this.numPlates = numPlates;
+		this.markDirty();
 	}
 
 	public int getMaxGens() {
@@ -215,5 +226,6 @@ public class TUMWorldGenData extends WorldSavedData {
 
 	public void setMaxGens(int maxGens) {
 		this.maxGens = maxGens;
+		this.markDirty();
 	}
 }
