@@ -1,12 +1,12 @@
 package com.tepidpond.tum;
 
-import java.util.Date;
-
 import net.minecraft.world.WorldType;
+import net.minecraftforge.common.DimensionManager;
 import net.minecraftforge.common.MinecraftForge;
 
 import com.tepidpond.tum.PlateTectonics.Lithosphere;
 import com.tepidpond.tum.PlateTectonics.Util;
+import com.tepidpond.tum.WorldGen.TUMProvider;
 import com.tepidpond.tum.WorldGen.TUMWorldType;
 
 import cpw.mods.fml.client.FMLClientHandler;
@@ -47,6 +47,18 @@ public class TUM
     @EventHandler
     public void preInit(FMLInitializationEvent event)
     {
+    	// This is only possible because of tfc_at.cfg and the build.gradle line that calls it.
+    	WorldType.DEFAULT = new TUMWorldType("TUMDefault");
+
+    	DimensionManager.unregisterDimension(-1);
+    	DimensionManager.unregisterDimension(0);
+    	DimensionManager.unregisterDimension(1);
+    	DimensionManager.unregisterProviderType(-1);
+    	DimensionManager.unregisterProviderType(0);
+    	DimensionManager.unregisterProviderType(1);
+    	
+    	DimensionManager.registerProviderType(0, TUMProvider.class, true);
+    	DimensionManager.registerDimension(0, 0);
     }
     
     @EventHandler
