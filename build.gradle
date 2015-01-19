@@ -22,7 +22,7 @@ group= "com.tepidpond.tum" // http://maven.apache.org/guides/mini/guide-naming-c
 archivesBaseName = "tum"
 
 minecraft {
-    version = "1.7.10-10.13.2.1230"
+    version = "1.7.10-10.13.2.1272"
     runDir = "eclipse"
 }
 
@@ -72,6 +72,12 @@ processResources
     // copy everything else, thats not the mcmod.info
     from(sourceSets.main.resources.srcDirs) {
         exclude 'mcmod.info'
+    }
+}
+
+jar {
+        manifest {
+        attributes 'FMLAT': 'tum_at.cfg'
     }
 }
 
