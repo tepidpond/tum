@@ -9,10 +9,15 @@ import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.gen.ChunkProviderGenerate;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import com.tepidpond.tum.PlateTectonics.Lithosphere;
 import com.tepidpond.tum.PlateTectonics.Util;
 
 public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
+    private static final Logger logger = LogManager.getLogger();
+
 	private World worldObj;
 	private Lithosphere lithos;
 	private TUMPerWorldData data;
@@ -33,6 +38,7 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 		
 		data = TUMPerWorldData.get(world);
 		if (!data.isHeightMapGenerated()) {
+			logger.info("Pre-generating heightMap...");
 			lithos = new Lithosphere(
 					data.getMapSize(),
 					data.getLandSeaRatio(),
@@ -48,6 +54,7 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 				lithos.Update();
 				// TODO: Some updating of something here is essential
 			}
+			logger.info("...done");
 			
 			// Save the normalized output.
 			data.setHeightMap(Util.normalizeHeightMapCopy(lithos.getHeightmap()), lithos.getMapSize());
