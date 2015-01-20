@@ -102,70 +102,75 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 	}
 	
 	private float quadInterpolate(float[] map, int mapSideLength, float X, float Y) {
-		int mapOriginX = (int)Math.floor(X); while (mapOriginX < 0) mapOriginX += mapSideLength; mapOriginX %= mapSideLength;
-		int mapOriginY = (int)Math.floor(Y); while (mapOriginY < 0) mapOriginY += mapSideLength; mapOriginY %= mapSideLength;
-		float mapOffsetX = (float) (X - Math.floor(X));
-		float mapOffsetY = (float) (Y - Math.floor(Y));
-		int x0 = mapOriginX, x1 = mapOriginX, y0 = mapOriginY, y1 = mapOriginY;
-		if (mapOffsetX > mapOriginX) {
-			x1 = Math.min(mapOriginX + 1, mapSideLength - 1);
-		} else if (mapOffsetX < 0) {
-			mapOffsetX = -mapOffsetX;
-			x1 = Math.max(mapOriginX - 1, 0);
-		}
-		if (mapOffsetY > 0) {
-			y1 = Math.min(mapOriginY + 1, mapSideLength - 1);
-		} else if (mapOffsetY < 0) {
-			mapOffsetY = -mapOffsetY;
-			y1 = Math.max(mapOriginY - 1, 0);
-		}
-		int a = y0 * mapSideLength + x0;
-		int b = y0 * mapSideLength + x1;
-		int c = y1 * mapSideLength + x0;
-		int d = y1 * mapSideLength + y1;
 		
+		// round to nearest int
+		int mapOriginX = (int)Math.round(X);
+		int mapOriginY = (int)Math.round(Y);
+		// save fractional part for interpolating
+		X -= mapOriginX; Y -= mapOriginY;
+		// wrap into range (0,511) 
+		mapOriginX %= mapSideLength; if (mapOriginX < 0) mapOriginX += mapSideLength;
+		mapOriginY %= mapSideLength; if (mapOriginY < 0) mapOriginY += mapSideLength;
+
+		if (Math.abs(X) < 1 / 64f && Math.abs(Y) < 1 / 64f)
+			return map[Util.getTile(mapOriginX, mapOriginY, mapSideLength)];
+
+		// select x/y coordinates for points a(x0, y0), b(x1, y0), c(x0, y1), d(x1, y1)
+		// Wrapping at edges is most natural.
+		int x0 = mapOriginX, x1 = mapOriginX, y0 = mapOriginY, y1 = mapOriginY;
+		if (X > 0) {
+			x1 = (mapOriginX + 1) % mapSideLength;
+		} else if (X < 0) {
+			x1 = mapOriginX == 0 ? mapSideLength - 1: mapOriginX - 1;
+		}
+		if (Y > 0) {
+			y1 = (mapOriginY + 1) % mapSideLength;
+		} else if (Y < 0) {
+			x1 = mapOriginY == 0 ? mapSideLength - 1: mapOriginY - 1;
+		}
+		// X/Y values need to be positive for the below formula. Because pt a is defined
+		// to be the origin this works, X/Y are then positive offsets away from the origin
+		X = Math.abs(X); Y = Math.abs(Y);
+		// Calc indices for the points in the heightMap.
+		int a = Util.getTile(x0, y0, mapSideLength);
+		int b = Util.getTile(x1, y0, mapSideLength);
+		int c = Util.getTile(x0, y1, mapSideLength);
+		int d = Util.getTile(x1, y1, mapSideLength);
+
+		assert (mapOriginX >= 0 && mapOriginX < mapSideLength && mapOriginY >= 0 && mapOriginY < mapSideLength) &&
+		       (X >= -1f && X <= 1f && Y >= -1f && Y <= 1f) &&
+		       (a >= 0 && b >= 0 && c >= 0 && d >= 0) &&
+		       (a < map.length && b < map.length && c < map.length && d < map.length):
+		       "Impossibilities in quadInterpolate, failed validation.";
+		       
 		// quadratic interpolation: a + (b-a)x + (c-a)y + (a-b-c+d)xy
-		return map[a] + (map[b] - map[a]) * mapOffsetX + (map[c] - map[a]) * mapOffsetY +
-				(map[a] - map[b] - map[c] + map[d]) * mapOffsetX * mapOffsetY;
+		return map[a] + (map[b] - map[a]) * X + (map[c] - map[a]) * Y +
+				(map[a] - map[b] - map[c] + map[d]) * X * Y;
 	}
 	
 	private void generateTerrain(int chunkX, int chunkZ, Block[] idsTop, Random rand, Block[] idsBig, byte[] metaBig) {
 		int worldHeight = 256;
-		int indexOffset = 128;
+		float scaleFactor = 1f;
 		
 		float[] hm = data.getHeightMap();
-		float vals[][] = new float[3][3];
-		int hmSourceX = (chunkX + data.getMapSize() / 2) % data.getMapSize();
-		int hmSourceZ = (chunkZ + data.getMapSize() / 2) % data.getMapSize();
-		if (hmSourceX < 0 || hmSourceZ < 0) return;		// empty chunks outside generation border.
-
-		for (int z = 0; z < 3; z++) {
-			for (int x = 0; x < 3; x++) {
-				int hmX = hmSourceX + x - 1;
-				int hmZ = hmSourceZ + z - 1;
-				if (hmX < 0) hmX = 0; if (hmX >= data.getMapSize()) hmX = data.getMapSize() - 1;
-				if (hmZ < 0) hmZ = 0; if (hmZ >= data.getMapSize()) hmZ = data.getMapSize() - 1;
-				int tileIndex = hmZ * data.getMapSize() + hmX;
-
-				vals[x][z] = hm[tileIndex];
-			}
-		}
-
 		for (int x = 0; x<16; x++)
 		{
+			float xCoord = ((chunkX << 4) + x + 0.5f) / scaleFactor;
 			for (int z = 0; z<16; z++)
 			{
-				int sample = (int) (128f * quadInterpolate(vals, (x - 8f) / 16f, (z - 8f) / 16f));
+				float zCoord = ((chunkZ << 4) + z + 0.5f) / scaleFactor;
+				float sample = quadInterpolate(hm, data.getMapSize(), xCoord, zCoord);
+				int iSample = (int) (sample * 63 / Lithosphere.CONTINENTAL_BASE);
 				
-				int arrayIndex = x + z * 16;
-				for (int height = 127; height >= 0; height--)
+				int arrayIndex = (x << 4 | z) * worldHeight;
+				idsBig[arrayIndex] = Blocks.bedrock;
+				for (int height = 1; height < worldHeight; height++)
 				{
-					int indexBig = x * 16 * 256 | z * 256 | height;
-
-					if (sample > height)
-						idsBig[indexBig] = Blocks.stone;
+					arrayIndex++;
+					if (iSample > height)
+						idsBig[arrayIndex] = Blocks.stone;
 					else
-						idsBig[indexBig] = Blocks.air;
+						idsBig[arrayIndex] = Blocks.air;
 				}
 			}
 		}
