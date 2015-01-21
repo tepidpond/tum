@@ -33,14 +33,8 @@ public class Util {
 			label = new JLabel();
 			frame.getContentPane().add(label, BorderLayout.CENTER);
 			frame.pack();
-			if (index == 0) {
-				frame.setLocationRelativeTo(null);
-				frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-			} else {
-				frame.setLocationRelativeTo(_instances[index - 1].frame);
-				frame.setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
-			}
-			Hide();
+
+			Hide(index);
 		}
 		
 		public static void DisplayImage(BufferedImage bi) { DisplayImage(bi, 0); }
