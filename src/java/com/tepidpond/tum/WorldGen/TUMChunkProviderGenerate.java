@@ -7,6 +7,7 @@ import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
+import net.minecraft.world.chunk.IChunkProvider;
 import net.minecraft.world.gen.ChunkProviderGenerate;
 
 import org.apache.logging.log4j.LogManager;
@@ -78,15 +79,21 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 		
 		chunk.generateSkylightMap();
 		return chunk;
-	}	
+	}
+	
+	@Override
+	public void populate(IChunkProvider icp, int chunkX, int chunkZ) {
+		return;	// Do nothing!
+	}
 	
 	private void generateTerrain(int chunkX, int chunkZ, Block[] idsTop, Random rand, Block[] idsBig, byte[] metaBig) {
 		int worldHeight = 256;
 		float scaleFactor = 1f / 4f;
 		float min = TUMPerWorldData.get(worldObj).getHeightMapMin();
 		float max = TUMPerWorldData.get(worldObj).getHeightMapMax();
-		// We leave 4 blocks out because the base of the world should be consistent.
-		float heightScale = (worldHeight - 4f) / (max - min);
+		float reservedBasement = 4f;
+		float heightScale = (worldHeight - reservedBasement) / (max - min);
+		int seaLevel = (int) ((Lithosphere.CONTINENTAL_BASE - min) * heightScale);
 
 		float[] hm = data.getHeightMap();
 		for (int x = 0; x<16; x++)
@@ -96,15 +103,17 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 			{
 				float zCoord = ((chunkZ * 16) + z);
 				float sample = Util.quadInterpolate(hm, data.getMapSize(), xCoord * scaleFactor, zCoord * scaleFactor);
-				sample -= min; sample *= heightScale; sample += 4f;
+				sample = (sample - min) * heightScale + reservedBasement;
 				
 				int arrayIndex = (x << 4 | z) * worldHeight;
-				idsBig[arrayIndex] = Blocks.bedrock;
-				for (int height = 1; height < worldHeight; height++)
+				for (int height = 0; height < worldHeight; height++, arrayIndex++)
 				{
-					arrayIndex++;
-					if (sample > height)
+					if (height < reservedBasement)
+						idsBig[arrayIndex] = Blocks.bedrock;
+					else if (sample > height)
 						idsBig[arrayIndex] = Blocks.stone;
+					else if (height < seaLevel)
+						idsBig[arrayIndex] = Blocks.water;
 					else
 						idsBig[arrayIndex] = Blocks.air;
 				}

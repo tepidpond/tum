@@ -137,17 +137,19 @@ public class TUMPerWorldData extends WorldSavedData {
 	public boolean isHeightMapGenerated() {
 		return heightMapGenerated;
 	}
-	public void setHeightMap(float heightMap[], int mapSize) {
-		if ((heightMap.length & -heightMap.length) == heightMap.length && heightMap.length == Math.pow(mapSize, 2)) {
+	public void setHeightMap(float map[], int mapSize) {
+		if ((map.length & -map.length) == map.length && map.length == Math.pow(mapSize, 2)) {
 			float min = Float.MAX_VALUE;
 			float max = 0.0f;
-			for(int i=0; i<heightMap.length; i++) {
-				if (heightMap[i] > max) max = heightMap[i];
-				if (heightMap[i] < min) min = heightMap[i];
+			for(int i=0; i < map.length; i++) {
+				if (map[i] > max) max = map[i];
+				if (map[i] < min) min = map[i];
 			}
+			heightMapMax = max;
+			heightMapMin = min;
 			
 			this.mapSize = mapSize;
-			this.heightMap = heightMap;
+			this.heightMap = map;
 			heightMapGenerated = true;
 			this.markDirty();
 		}
