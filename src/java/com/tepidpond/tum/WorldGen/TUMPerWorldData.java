@@ -11,7 +11,6 @@ import net.minecraft.world.World;
 import net.minecraft.world.WorldSavedData;
 
 import com.tepidpond.tum.G;
-import com.tepidpond.tum.PlateTectonics.Lithosphere;
 
 public class TUMPerWorldData extends WorldSavedData {
 	private static final String tagPerWorldData = G.ModID;
@@ -30,6 +29,8 @@ public class TUMPerWorldData extends WorldSavedData {
 	
 	/* Region: Items saved in TUM.WorldGen.Storage */
 	private float[] heightMap;
+	private float heightMapMax = 1.0f;
+	private float heightMapMin = 0.0f;
 	private boolean heightMapGenerated = false;
 	
 	public TUMPerWorldData() {
@@ -70,7 +71,7 @@ public class TUMPerWorldData extends WorldSavedData {
 					for(int i=0; i < heightMap.length; i++) {
 						heightMap[i] = dis.readFloat();							
 					}
-					this.heightMap = heightMap;
+					setHeightMap(heightMap, mapSize);
 				} catch (IOException e) {
 					// There is no need to be upset. Just regenerate it. An extra minute at world
 					// load time is only annoying.
@@ -138,11 +139,26 @@ public class TUMPerWorldData extends WorldSavedData {
 	}
 	public void setHeightMap(float heightMap[], int mapSize) {
 		if ((heightMap.length & -heightMap.length) == heightMap.length && heightMap.length == Math.pow(mapSize, 2)) {
+			float min = Float.MAX_VALUE;
+			float max = 0.0f;
+			for(int i=0; i<heightMap.length; i++) {
+				if (heightMap[i] > max) max = heightMap[i];
+				if (heightMap[i] < min) min = heightMap[i];
+			}
+			
 			this.mapSize = mapSize;
 			this.heightMap = heightMap;
 			heightMapGenerated = true;
 			this.markDirty();
 		}
+	}
+	
+	public float getHeightMapMax() {
+		return heightMapMax;
+	}
+
+	public float getHeightMapMin() {
+		return heightMapMin;
 	}
 	
 	public int getMapSize() {

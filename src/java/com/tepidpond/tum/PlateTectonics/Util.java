@@ -94,6 +94,46 @@ public class Util {
 	public static final int getY(int mapTile, int mapWidth) {
 		return mapTile / mapWidth;
 	}
+	public static float quadInterpolate(float[] map, int mapSideLength, float X, float Y) {
+		
+		// round to nearest int
+		int mapOriginX = (int)Math.round(X);
+		int mapOriginY = (int)Math.round(Y);
+		// save fractional part for interpolating
+		X -= mapOriginX; Y -= mapOriginY;
+		// wrap into range (0,511) 
+		mapOriginX %= mapSideLength; if (mapOriginX < 0) mapOriginX += mapSideLength;
+		mapOriginY %= mapSideLength; if (mapOriginY < 0) mapOriginY += mapSideLength;
+
+		// select x/y coordinates for points a(x0, y0), b(x1, y0), c(x0, y1), d(x1, y1)
+		// Wrapping at edges is most natural.
+		int x0 = mapOriginX, y0 = mapOriginY, x1, y1;
+		
+		if (X > 0) {
+			x1 = (mapOriginX + 1) % mapSideLength;
+		} else {
+			x1 = mapOriginX == 0 ? mapSideLength - 1: mapOriginX - 1;
+			X = -X;
+		}
+		if (Y > 0) {
+			y1 = (mapOriginY + 1) % mapSideLength;
+		} else {
+			y1 = mapOriginY == 0 ? mapSideLength - 1: mapOriginY - 1;
+			Y = -Y;
+		}
+
+		// Calc indices for the points in the heightMap.
+		float a = map[Util.getTile(x0, y0, mapSideLength)];
+		float b = map[Util.getTile(x1, y0, mapSideLength)];
+		float c = map[Util.getTile(x0, y1, mapSideLength)];
+		float d = map[Util.getTile(x1, y1, mapSideLength)];			
+
+		assert (x0 >= 0 && x0 < mapSideLength && x1 >= 0 && x1 < mapSideLength && x0 >= 0 && y0 < mapSideLength):
+	           "Impossibilities in quadInterpolate, failed validation.";
+
+		// quadratic interpolation: a + (b-a)x + (c-a)y + (a-b-c+d)xy
+		return a + (b - a) * X + (c - a) * Y + (a + d - (b + c)) * X * Y;
+	}
 	
 	public static BufferedImage renderIntmap(int intMap[], int mapWidth, int mapHeight) {
 		BufferedImage bi = new BufferedImage(mapWidth, mapHeight, BufferedImage.TYPE_INT_ARGB);

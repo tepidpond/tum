@@ -12,11 +12,12 @@ import net.minecraft.world.gen.ChunkProviderGenerate;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import com.tepidpond.tum.G;
 import com.tepidpond.tum.PlateTectonics.Lithosphere;
 import com.tepidpond.tum.PlateTectonics.Util;
 
 public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
-    private static final Logger logger = LogManager.getLogger();
+    private static final Logger logger = LogManager.getLogger(G.ModID + ".WorldGen");
 
 	private World worldObj;
 	private Lithosphere lithos;
@@ -55,9 +56,9 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 				// TODO: Some updating of something here is essential
 			}
 			logger.info("...done");
-			
+						
 			// Save the normalized output.
-			data.setHeightMap(Util.normalizeHeightMapCopy(lithos.getHeightmap()), lithos.getMapSize());
+			data.setHeightMap(lithos.getHeightmap(), lithos.getMapSize());
 			data.markDirty();
 		}
 	}
@@ -77,97 +78,32 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 		
 		chunk.generateSkylightMap();
 		return chunk;
-	}
-
-	private float quadInterpolate(float[][] field, float X, float Y) {
-		int x0 = 1, x1 = 1, y0 = 1, y1 = 1;
-		if (X > 0) {
-			x0 = 1; x1 = 2;
-		} else if (X < 0) {
-			X = -X;
-			x0 = 1; x1 = 0;
-		}
-		if (Y > 0) {
-			y0 = 1; y1 = 2;
-		} else if (Y < 0) {
-			Y = -Y;
-			y0 = 1; y1 = 0;
-		}
-		
-		// quadratic interpolation: a + (b-a)x + (c-a)y + (a-b-c+d)xy
-		return field[x0][y0] +
-		      (field[x1][y0] - field[x0][y0]) * X +
-		      (field[x0][y1] - field[x0][y0]) * Y +
-		      (field[x0][y0] - field[x1][y0] - field[x0][y1] + field[x1][y1]) * X * Y;
-	}
-	
-	private float quadInterpolate(float[] map, int mapSideLength, float X, float Y) {
-		
-		// round to nearest int
-		int mapOriginX = (int)Math.round(X);
-		int mapOriginY = (int)Math.round(Y);
-		// save fractional part for interpolating
-		X -= mapOriginX; Y -= mapOriginY;
-		// wrap into range (0,511) 
-		mapOriginX %= mapSideLength; if (mapOriginX < 0) mapOriginX += mapSideLength;
-		mapOriginY %= mapSideLength; if (mapOriginY < 0) mapOriginY += mapSideLength;
-
-		if (Math.abs(X) < 1 / 64f && Math.abs(Y) < 1 / 64f)
-			return map[Util.getTile(mapOriginX, mapOriginY, mapSideLength)];
-
-		// select x/y coordinates for points a(x0, y0), b(x1, y0), c(x0, y1), d(x1, y1)
-		// Wrapping at edges is most natural.
-		int x0 = mapOriginX, x1 = mapOriginX, y0 = mapOriginY, y1 = mapOriginY;
-		if (X > 0) {
-			x1 = (mapOriginX + 1) % mapSideLength;
-		} else if (X < 0) {
-			x1 = mapOriginX == 0 ? mapSideLength - 1: mapOriginX - 1;
-		}
-		if (Y > 0) {
-			y1 = (mapOriginY + 1) % mapSideLength;
-		} else if (Y < 0) {
-			x1 = mapOriginY == 0 ? mapSideLength - 1: mapOriginY - 1;
-		}
-		// X/Y values need to be positive for the below formula. Because pt a is defined
-		// to be the origin this works, X/Y are then positive offsets away from the origin
-		X = Math.abs(X); Y = Math.abs(Y);
-		// Calc indices for the points in the heightMap.
-		int a = Util.getTile(x0, y0, mapSideLength);
-		int b = Util.getTile(x1, y0, mapSideLength);
-		int c = Util.getTile(x0, y1, mapSideLength);
-		int d = Util.getTile(x1, y1, mapSideLength);
-
-		assert (mapOriginX >= 0 && mapOriginX < mapSideLength && mapOriginY >= 0 && mapOriginY < mapSideLength) &&
-		       (X >= -1f && X <= 1f && Y >= -1f && Y <= 1f) &&
-		       (a >= 0 && b >= 0 && c >= 0 && d >= 0) &&
-		       (a < map.length && b < map.length && c < map.length && d < map.length):
-		       "Impossibilities in quadInterpolate, failed validation.";
-		       
-		// quadratic interpolation: a + (b-a)x + (c-a)y + (a-b-c+d)xy
-		return map[a] + (map[b] - map[a]) * X + (map[c] - map[a]) * Y +
-				(map[a] - map[b] - map[c] + map[d]) * X * Y;
-	}
+	}	
 	
 	private void generateTerrain(int chunkX, int chunkZ, Block[] idsTop, Random rand, Block[] idsBig, byte[] metaBig) {
 		int worldHeight = 256;
-		float scaleFactor = 1f;
-		
+		float scaleFactor = 1f / 4f;
+		float min = TUMPerWorldData.get(worldObj).getHeightMapMin();
+		float max = TUMPerWorldData.get(worldObj).getHeightMapMax();
+		// We leave 4 blocks out because the base of the world should be consistent.
+		float heightScale = (worldHeight - 4f) / (max - min);
+
 		float[] hm = data.getHeightMap();
 		for (int x = 0; x<16; x++)
 		{
-			float xCoord = ((chunkX << 4) + x + 0.5f) / scaleFactor;
+			float xCoord = ((chunkX * 16) + x);
 			for (int z = 0; z<16; z++)
 			{
-				float zCoord = ((chunkZ << 4) + z + 0.5f) / scaleFactor;
-				float sample = quadInterpolate(hm, data.getMapSize(), xCoord, zCoord);
-				int iSample = (int) (sample * 63 / Lithosphere.CONTINENTAL_BASE);
+				float zCoord = ((chunkZ * 16) + z);
+				float sample = Util.quadInterpolate(hm, data.getMapSize(), xCoord * scaleFactor, zCoord * scaleFactor);
+				sample -= min; sample *= heightScale; sample += 4f;
 				
 				int arrayIndex = (x << 4 | z) * worldHeight;
 				idsBig[arrayIndex] = Blocks.bedrock;
 				for (int height = 1; height < worldHeight; height++)
 				{
 					arrayIndex++;
-					if (iSample > height)
+					if (sample > height)
 						idsBig[arrayIndex] = Blocks.stone;
 					else
 						idsBig[arrayIndex] = Blocks.air;
