@@ -4,15 +4,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-import net.minecraft.world.ChunkPosition;
+import net.minecraft.util.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldType;
 import net.minecraft.world.biome.BiomeCache;
 import net.minecraft.world.biome.BiomeGenBase;
 import net.minecraft.world.biome.WorldChunkManager;
 import net.minecraft.world.gen.layer.GenLayer;
-import net.minecraft.world.gen.layer.GenLayerBiome;
-import net.minecraft.world.gen.layer.GenLayerVoronoiZoom;
 
 public class TUMWorldChunkManager extends WorldChunkManager {
 	protected World worldObj;
@@ -41,16 +39,16 @@ public class TUMWorldChunkManager extends WorldChunkManager {
 		seed = Seed;
 		
 		GenLayer[] layers;
-		layers = GenLayer.initializeAllBiomeGenerators(Seed, TUMWorldType.DEFAULT);
+		layers = GenLayer.func_180781_a(Seed, TUMWorldType.DEFAULT, "");
 		this.genBiomes = new TUMGenLayerIsland(Seed);
 		this.biomeIndexLayer = new TUMGenLayerIsland(Seed);
 	}
 	
 	@Override
-	public ChunkPosition findBiomePosition(int x, int z, int radius, List biomeList, Random rand)
+	public BlockPos findBiomePosition(int x, int z, int radius, List biomeList, Random rand)
 	{
 		// TODO: Probably do something here.
-		return new ChunkPosition(x, 0, z); 
+		return new BlockPos(x, 0, z); 
 	}
 	
 	@Override

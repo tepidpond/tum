@@ -7,6 +7,8 @@ import net.minecraft.block.Block;
 import net.minecraft.init.Blocks;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.Chunk;
+import net.minecraft.world.chunk.ChunkPrimer;
+import net.minecraft.world.chunk.IChunkProvider;
 import net.minecraft.world.gen.ChunkProviderGenerate;
 
 import org.apache.logging.log4j.LogManager;
@@ -23,20 +25,14 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 	private TUMPerWorldData data;
 	private Random rand;
 	
-	private Block[] idsTop;
-	private Block[] idsBig;
-	private byte[] metaBig;
-	
 	public TUMChunkProviderGenerate(World world, long seed, boolean par4) {
-		super(world, seed, par4);
+		super(world, seed, par4, null);
 		worldObj = world;
 		rand = new Random(seed);
-		
-		this.idsTop = new Block[32768];
-		this.idsBig = new Block[16*16*256];
-		this.metaBig = new byte[16*16*256];
-		
-		data = TUMPerWorldData.get(world);
+	}
+	
+	private void loadPerWorldData() {
+		data = TUMPerWorldData.get(worldObj);
 		if (!data.isHeightMapGenerated()) {
 			logger.info("Pre-generating heightMap...");
 			lithos = new Lithosphere(
@@ -62,21 +58,26 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 		}
 	}
 	
+	
 	@Override
 	public Chunk provideChunk(int chunkX, int chunkZ)
 	{
+		if (data == null) loadPerWorldData();
+
 		this.rand.setSeed(chunkX * 341873128712L + chunkZ * 132897987541L);
 		
-		Arrays.fill(idsTop, null);
-		Arrays.fill(idsBig, null);
-		Arrays.fill(metaBig, (byte)0);
+		ChunkPrimer cp = new ChunkPrimer();
+		generateTerrain(chunkX, chunkZ, cp, rand);
 		
-		generateTerrain(chunkX, chunkZ, idsTop, rand, idsBig, metaBig);
-		
-		Chunk chunk = new Chunk(this.worldObj, idsBig, metaBig, chunkX, chunkZ);
+		Chunk chunk = new Chunk(this.worldObj, cp, chunkX, chunkZ);
 		
 		chunk.generateSkylightMap();
 		return chunk;
+	}
+	
+	@Override
+    public void populate(IChunkProvider icp, int chunkX, int chunkZ) {
+		// TODO: Do something.
 	}
 
 	private float quadInterpolate(float[][] field, float X, float Y) {
@@ -148,7 +149,7 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 				(map[a] - map[b] - map[c] + map[d]) * X * Y;
 	}
 	
-	private void generateTerrain(int chunkX, int chunkZ, Block[] idsTop, Random rand, Block[] idsBig, byte[] metaBig) {
+	private void generateTerrain(int chunkX, int chunkZ, ChunkPrimer cp, Random rand) {
 		int worldHeight = 256;
 		float scaleFactor = 1f;
 		
@@ -162,15 +163,13 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 				float sample = quadInterpolate(hm, data.getMapSize(), xCoord, zCoord);
 				int iSample = (int) (sample * 63 / Lithosphere.CONTINENTAL_BASE);
 				
-				int arrayIndex = (x << 4 | z) * worldHeight;
-				idsBig[arrayIndex] = Blocks.bedrock;
+				cp.setBlockState(x, 0, z, Blocks.bedrock.getDefaultState());
 				for (int height = 1; height < worldHeight; height++)
 				{
-					arrayIndex++;
 					if (iSample > height)
-						idsBig[arrayIndex] = Blocks.stone;
+						cp.setBlockState(x, height, z, Blocks.stone.getDefaultState());
 					else
-						idsBig[arrayIndex] = Blocks.air;
+						cp.setBlockState(x, height, z, Blocks.air.getDefaultState());
 				}
 			}
 		}

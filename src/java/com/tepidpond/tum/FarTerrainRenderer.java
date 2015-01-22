@@ -3,16 +3,16 @@ package com.tepidpond.tum;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.renderer.Tessellator;
+import net.minecraft.client.renderer.WorldRenderer;
 import net.minecraft.client.renderer.entity.RenderManager;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraftforge.client.IRenderHandler;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 
 import org.lwjgl.opengl.GL11;
-
-import cpw.mods.fml.common.eventhandler.SubscribeEvent;
-import cpw.mods.fml.relauncher.Side;
-import cpw.mods.fml.relauncher.SideOnly;
 
 @SideOnly(Side.CLIENT)
 public class FarTerrainRenderer extends IRenderHandler {
@@ -23,7 +23,7 @@ public class FarTerrainRenderer extends IRenderHandler {
 	public FarTerrainRenderer(Minecraft mc) {
 		this.mc = mc;
 		this.renderEngine = mc.getTextureManager();
-		this.renderManager = RenderManager.instance;
+		this.renderManager = mc.getRenderManager();
 	}
 	
 	@SubscribeEvent
@@ -73,7 +73,7 @@ public class FarTerrainRenderer extends IRenderHandler {
         int textWidth = 0;
         for (String thisMessage : text)
         {
-            int thisMessageWidth = mc.fontRenderer.getStringWidth(thisMessage);
+            int thisMessageWidth = mc.fontRendererObj.getStringWidth(thisMessage);
 
             if (thisMessageWidth > textWidth)
             	textWidth = thisMessageWidth;
@@ -83,15 +83,15 @@ public class FarTerrainRenderer extends IRenderHandler {
         
         if(renderBlackBackground)
         {
-            Tessellator tessellator = Tessellator.instance;
-        	
+            Tessellator tessellator = Tessellator.getInstance();
+        	WorldRenderer wr = tessellator.getWorldRenderer();
             GL11.glDisable(GL11.GL_TEXTURE_2D);
-            tessellator.startDrawingQuads();
+            wr.startDrawingQuads();
             int stringMiddle = textWidth / 2;
-            tessellator.addVertex(-stringMiddle - 1, -1 + 0, 0.0D);
-            tessellator.addVertex(-stringMiddle - 1, 8 + lineHeight*text.length-lineHeight, 0.0D);
-            tessellator.addVertex(stringMiddle + 1, 8 + lineHeight*text.length-lineHeight, 0.0D);
-            tessellator.addVertex(stringMiddle + 1, -1 + 0, 0.0D);
+            wr.addVertex(-stringMiddle - 1, -1 + 0, 0.0D);
+            wr.addVertex(-stringMiddle - 1, 8 + lineHeight*text.length-lineHeight, 0.0D);
+            wr.addVertex(stringMiddle + 1, 8 + lineHeight*text.length-lineHeight, 0.0D);
+            wr.addVertex(stringMiddle + 1, -1 + 0, 0.0D);
             tessellator.draw();
             GL11.glEnable(GL11.GL_TEXTURE_2D);
         }
@@ -99,7 +99,7 @@ public class FarTerrainRenderer extends IRenderHandler {
         int i = 0;
         for(String message : text)
         {
-        	mc.fontRenderer.drawString(message, -textWidth / 2, i*lineHeight, color);
+        	mc.fontRendererObj.drawString(message, -textWidth / 2, i*lineHeight, color);
         	i++;
         }
         
