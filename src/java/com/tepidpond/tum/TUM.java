@@ -33,15 +33,15 @@ public class TUM
    			10,		// number of plates to create
    			0);		// creation seed
 		Util.displayHeightmap(0, lithos.getHeightmap(), lithos.getMapSize(), lithos.getMapSize(), "Terrain");
-       	long dateBegin = System.currentTimeMillis();
-    	for (int i=0; i<6000; i++) {
-    		lithos.Update();
-    		if (i % 32 == 0)
-    			Util.displayHeightmap(0, lithos.getHeightmap(), lithos.getMapSize(), lithos.getMapSize(), "Terrain");
-    	}
-    	float seconds = (System.currentTimeMillis() - dateBegin) / 1000f;
-		Util.displayHeightmap(0, lithos.getHeightmap(), lithos.getMapSize(), lithos.getMapSize(), "Terrain");
-    	assert false: String.format("Completed inital generation in %f seconds.", seconds);
+		
+		int mapScaled = 512;
+		float scaleFactor = 1f/16f;
+		float hm2[] = new float[mapScaled * mapScaled];
+		for (int i = 0; i < hm2.length; i++) {
+			float x = (i % mapScaled) * scaleFactor; float y = (i / mapScaled) * scaleFactor;
+			hm2[i] = Util.quadInterpolate(lithos.getHeightmap(), lithos.getMapSize(), 128f+x, 128f+y);
+		}
+		Util.displayHeightmap(1, hm2, mapScaled, mapScaled, "Scaling test");
     }
     
     @EventHandler
