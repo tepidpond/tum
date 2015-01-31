@@ -25,7 +25,7 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 	private Random rand;
 	
 	public TUMChunkProviderGenerate(World world, long seed, boolean par4) {
-		super(world, seed, par4, null);
+		super(world, seed, par4, "");	// Blank sets ChunkProviderSettings to defaults
 		worldObj = world;
 		rand = new Random(seed);
 	}
