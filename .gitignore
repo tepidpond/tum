@@ -1,10 +1,27 @@
-eclipse/
-.metadata/
-bin/
-.gradle/
-.settings/
+# eclipse
+bin
+*.launch
+.settings
+.metadata
 .classpath
 .project
+
+# idea
+out
+*.ipr
+*.iws
+*.iml
+.idea
+
+# gradle
+build
+.gradle
+
+# other
+eclipse
+run
+
+# forge distro files
 CREDITS-fml.txt
 LICENSE-fml.txt
 MinecraftForge-Credits.txt
@@ -12,4 +29,3 @@ MinecraftForge-License.txt
 README.txt
 forge-*-changelog.txt
 JavaDoc/
-/bin/
