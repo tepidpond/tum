@@ -39,7 +39,7 @@ public class TUMWorldChunkManager extends WorldChunkManager {
 		seed = Seed;
 		
 		GenLayer[] layers;
-		layers = GenLayer.func_180781_a(Seed, TUMWorldType.DEFAULT, "");
+		layers = GenLayer.initializeAllBiomeGenerators(Seed, TUMWorldType.DEFAULT, "");
 		this.genBiomes = new TUMGenLayerIsland(Seed);
 		this.biomeIndexLayer = new TUMGenLayerIsland(Seed);
 	}
