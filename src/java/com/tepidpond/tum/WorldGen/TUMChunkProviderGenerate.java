@@ -75,6 +75,10 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 	}
 
 	private float quadInterpolate(float[][] field, float X, float Y) {
+		int xBase = (int)X % (lithos.getMapSize() - 1);
+		int yBase = (int)Y % (lithos.getMapSize() - 1);
+		X = X % 1;
+		Y = Y % 1;
 		int x0 = 1, x1 = 1, y0 = 1, y1 = 1;
 		if (X > 0) {
 			x0 = 1; x1 = 2;
@@ -90,10 +94,10 @@ public class TUMChunkProviderGenerate extends ChunkProviderGenerate {
 		}
 		
 		// quadratic interpolation: a + (b-a)x + (c-a)y + (a-b-c+d)xy
-		return field[x0][y0] +
-		      (field[x1][y0] - field[x0][y0]) * X +
-		      (field[x0][y1] - field[x0][y0]) * Y +
-		      (field[x0][y0] - field[x1][y0] - field[x0][y1] + field[x1][y1]) * X * Y;
+		return field[xBase + x0][yBase + y0] +
+		      (field[xBase + x1][yBase + y0] - field[xBase + x0][yBase + y0]) * X +
+		      (field[xBase + x0][yBase + y1] - field[xBase + x0][yBase + y0]) * Y +
+		      (field[xBase + x0][yBase + y0] - field[xBase + x1][yBase + y0] - field[xBase + x0][yBase + y1] + field[xBase + x1][yBase + y1]) * X * Y;
 	}
 	
 	@Override
