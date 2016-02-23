@@ -20,8 +20,8 @@ public class Lithosphere {
 	private float worldMap[];  // denotes height of terrain of tiles
 	private int worldPlates[];   // denotes plate ownership of tiles.
 	private Plate plates[];
-	private Stack<CollisionDetails> subductions[];
-	private Stack<CollisionDetails> collisions[];
+	private ArrayList<Stack<CollisionDetails>> subductions;
+	private ArrayList<Stack<CollisionDetails>> collisions;
 	
 	private int worldSurface;
 	private int worldSize;
@@ -62,12 +62,14 @@ public class Lithosphere {
 		
 		// Setup for collision storage for update. This is complex because
 		// "Cannot create generic array of ..." error otherwise.
-		subductions = (Stack<CollisionDetails>[]) new Stack[numPlates];	
-		collisions = (Stack<CollisionDetails>[]) new Stack[numPlates];
+		subductions = new ArrayList<Stack<CollisionDetails>>(numPlates);	
+		collisions = new ArrayList<Stack<CollisionDetails>>(numPlates);
+
 		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
-			subductions[activePlate] = new Stack<CollisionDetails>();
-			collisions[activePlate] = new Stack<CollisionDetails>();
+			subductions.add(activePlate, new Stack<CollisionDetails>());
+			collisions.add(activePlate, new Stack<CollisionDetails>());
 		}
+
 
 		float tmpWorldMap[] = new float[(int) Math.pow(mapSize + 1, 2)];
 		
@@ -145,6 +147,8 @@ public class Lithosphere {
 		addSeaFloorUplift(worldAgeMap);
 		
 		generations++;
+		
+		Util.displayHeightmap(0, this.getHeightmap(), this.getMapSize(), this.getMapSize(), "Terrain");		
 	}
 	
 	private void restart() {
@@ -256,7 +260,7 @@ public class Lithosphere {
 			float sediment = OCEANIC_BASE * (CONTINENTAL_BASE - plateMap[plateTile]) / CONTINENTAL_BASE;
 
 			// Save collision to the receiving plate's list.
-			subductions[worldPlates[worldTile]].Push(
+			subductions.get(worldPlates[worldTile]).Push(
 					new CollisionDetails(activePlate, worldX, worldY, sediment));
 
 			// Remove subducted oceanic lithosphere from plate.
@@ -271,7 +275,7 @@ public class Lithosphere {
 		} else if (prev_is_oceanic) {
 			float sediment = OCEANIC_BASE * (CONTINENTAL_BASE - worldMap[worldTile]) / CONTINENTAL_BASE;
 
-			subductions[activePlate].Push(
+			subductions.get(activePlate).Push(
 					new CollisionDetails(worldPlates[worldTile], worldX, worldY, sediment));
 
 			plates[worldPlates[worldTile]].setCrust(worldX, worldY, worldMap[worldTile] - OCEANIC_BASE, prev_timestamp);
@@ -304,12 +308,12 @@ public class Lithosphere {
 			plates[activePlate].setCrust(worldX, worldY, plateMap[plateTile] * (1.0f - foldingRatio), plateAge[plateTile]);
 
 			// Add collision to the earlier plate's list.
-			collisions[activePlate].Push(cd);
+			collisions.get(activePlate).Push(cd);
 		} else {
 			CollisionDetails cd = new CollisionDetails(activePlate, worldX, worldY, worldMap[worldTile] * foldingRatio);
 			plates[activePlate].setCrust(worldX, worldY, plateMap[plateTile] + cd.getCrust(), ageMap[worldTile]);
 			plates[(int) worldPlates[worldTile]].setCrust(worldX, worldY, worldMap[worldTile] * (1.0f - foldingRatio), ageMap[worldTile]);
-			collisions[(int) worldPlates[worldTile]].Push(cd);
+			collisions.get((int) worldPlates[worldTile]).Push(cd);
 
 			// Give the location to the larger plate.
 			assert(!Float.isNaN(plateMap[plateTile]));
@@ -323,18 +327,18 @@ public class Lithosphere {
 	private void processSubductions() {
 		// Process all subductions
 		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
-			for (CollisionDetails cd: subductions[activePlate]) {
+			for (CollisionDetails cd: subductions.get(activePlate)) {
 				plates[activePlate].addCrustBySubduction(
 					cd.getX(), cd.getY(), cd.getCrust(), generations,
 					plates[cd.getIndex()].vX, plates[cd.getIndex()].vY);
 			}
-			subductions[activePlate].clear();
+			subductions.get(activePlate).clear();
 		}
 	}
 	
 	private void processCollisions() {
 		for (int activePlate = 0; activePlate < numPlates; activePlate++) {
-			for (CollisionDetails cd: collisions[activePlate]) {
+			for (CollisionDetails cd: collisions.get(activePlate)) {
 				plates[activePlate].applyFriction(cd.getCrust());
 				plates[cd.getIndex()].applyFriction(cd.getCrust());
 				
@@ -348,7 +352,7 @@ public class Lithosphere {
 					plates[cd.getIndex()].collide(plates[activePlate], cd.getX(), cd.getY(), amount);
 				}
 			}
-			collisions[activePlate].clear();
+			collisions.get(activePlate).clear();
 		}
 	}
 	

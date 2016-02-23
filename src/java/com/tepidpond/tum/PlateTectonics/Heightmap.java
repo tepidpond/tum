@@ -18,7 +18,7 @@ public class Heightmap<T> {
 	private int Xoffset, Yoffset;
 	private int mapWidth, mapHeight;
 	private int mapArea;
-	private Heightmap parent;
+	private Heightmap<T> parent;
 	private T storage[];
 
 	/*
